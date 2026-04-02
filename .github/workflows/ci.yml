@@ -18,6 +18,8 @@ jobs:
 
       - run: npm ci --ignore-scripts
 
+      - run: npm audit --audit-level=high --omit=dev
+
       - run: npm rebuild better-sqlite3
 
       - run: npm test

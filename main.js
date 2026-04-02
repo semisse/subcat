@@ -251,7 +251,7 @@ ipcMain.handle('stop-watching', async (event, runId) => {
 });
 
 ipcMain.handle('open-external', async (event, url) => {
-    shell.openExternal(url);
+    if (url.startsWith('https://')) shell.openExternal(url);
 });
 
 ipcMain.handle('get-version', () => app.getVersion());

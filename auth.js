@@ -14,7 +14,7 @@ function storeToken(token) {
         throw new Error('OS encryption not available');
     }
     const encrypted = safeStorage.encryptString(token);
-    fs.writeFileSync(getTokenFile(), encrypted);
+    fs.writeFileSync(getTokenFile(), encrypted, { mode: 0o600 });
 }
 
 function loadToken() {
