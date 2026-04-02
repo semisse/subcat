@@ -1,6 +1,6 @@
 jest.mock('https');
 const https = require('https');
-const { parseGitHubUrl, githubGet, fetchFailedTests, rerunWorkflow } = require('../github');
+const { parseGitHubUrl, githubGet, fetchFailedTests, rerunWorkflow, cancelRun } = require('../github');
 
 // Helper to create a mock https response
 function mockResponse(statusCode, body) {
@@ -114,6 +114,42 @@ describe('rerunWorkflow', () => {
     test('rejects when rerun POST fails', async () => {
         mockRerunResponse(403);
         await expect(rerunWorkflow('owner', 'repo', '99999', 'token')).rejects.toThrow('Rerun failed: 403');
+    });
+});
+
+// ─── cancelRun ────────────────────────────────────────────────────────────────
+
+describe('cancelRun', () => {
+    beforeEach(() => {
+        https.request.mockClear();
+    });
+
+    function mockCancelResponse(statusCode = 202) {
+        const EventEmitter = require('events');
+        const res = new EventEmitter();
+        res.statusCode = statusCode;
+        const req = new EventEmitter();
+        req.end = jest.fn(() => res.emit('end'));
+        https.request.mockImplementationOnce((_, cb) => { cb(res); return req; });
+    }
+
+    test('resolves on 202', async () => {
+        mockCancelResponse(202);
+        await expect(cancelRun('owner', 'repo', '99', 'token')).resolves.toBeUndefined();
+    });
+
+    test('sends POST to the cancel endpoint', async () => {
+        mockCancelResponse(202);
+        await cancelRun('owner', 'repo', '99', 'token');
+        expect(https.request).toHaveBeenCalledWith(
+            expect.objectContaining({ method: 'POST', path: '/repos/owner/repo/actions/runs/99/cancel' }),
+            expect.any(Function)
+        );
+    });
+
+    test('rejects when cancel POST fails', async () => {
+        mockCancelResponse(403);
+        await expect(cancelRun('owner', 'repo', '99', 'token')).rejects.toThrow('Cancel failed: 403');
     });
 });
 

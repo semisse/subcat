@@ -48,6 +48,17 @@ describe('start / stop', () => {
         await tick(); // let loop finish cleanly
     });
 
+    test('second start() on same run (renderer reload) does not create a duplicate loop', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        poller.start(makeConfig(), () => 'token');
+        poller.start(makeConfig(), () => 'token'); // resumeRuns() called again on reload
+        await tick();
+
+        expect(github.fetchRunStatus).toHaveBeenCalledTimes(1);
+    });
+
     test('stop removes run from active and calls db.removeRun', async () => {
         github.fetchRunStatus.mockResolvedValue(makeRun());
         github.fetchFailedTests.mockResolvedValue([]);

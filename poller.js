@@ -26,6 +26,10 @@ class PollManager extends EventEmitter {
         db.removeRun(runId);
     }
 
+    deactivate(runId) {
+        this.#active.delete(runId);
+    }
+
     isActive(runId) {
         return this.#active.has(runId);
     }

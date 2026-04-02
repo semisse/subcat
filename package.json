@@ -1,13 +1,13 @@
 {
   "name": "subcat",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "Get notified when a GitHub Actions CI run finishes",
   "author": "Samuel Fialho",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
-    "test": "jest",
+    "test": "NODE_NO_WARNINGS=1 jest",
     "build:mac": "electron-builder --mac --config.mac.target=dmg",
     "postinstall": "electron-builder install-app-deps && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist"
   },
@@ -23,6 +23,11 @@
       "icon": "assets/Icon-iOS-Default-1024x1024@1x.png",
       "category": "public.app-category.developer-tools"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "semisse",
+      "repo": "subcat"
+    },
     "files": [
       "**/*",
       "!tests/**",
@@ -32,7 +37,17 @@
     ]
   },
   "dependencies": {
-    "better-sqlite3": "^12.8.0"
+    "better-sqlite3": "^12.8.0",
+    "electron-updater": "^6.8.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "testEnvironmentOptions": {
+      "nodeOptions": "--no-warnings"
+    }
   },
   "devDependencies": {
     "electron": "^35.0.0",

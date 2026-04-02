@@ -79,6 +79,10 @@ function getAllRuns() {
     return getDb().prepare(`SELECT * FROM runs ORDER BY created_at DESC`).all();
 }
 
+function getRun(id) {
+    return getDb().prepare(`SELECT * FROM runs WHERE id = ?`).get(id) ?? null;
+}
+
 function getRunResults(runId) {
     return getDb().prepare(`SELECT * FROM run_results WHERE run_id = ? ORDER BY number`).all(runId)
         .map(r => ({ ...r, failedTests: JSON.parse(r.failed_tests ?? '[]') }));
@@ -95,4 +99,4 @@ function getReport(runId) {
     return { name: run.name, rows };
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRunResults, removeRun, getReport };
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, getReport };

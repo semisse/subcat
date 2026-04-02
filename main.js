@@ -1,11 +1,22 @@
 const { app, BrowserWindow, ipcMain, Notification, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 const auth = require('./auth');
-const { parseGitHubUrl, fetchRunStatus, rerunWorkflow } = require('./github');
+const { parseGitHubUrl, fetchRunStatus, rerunWorkflow, cancelRun } = require('./github');
 const db = require('./db');
 const poller = require('./poller');
 
 app.setName('SubCat');
+
+app.setAboutPanelOptions({
+    applicationName: 'SubCat',
+    applicationVersion: app.getVersion(),
+    copyright: '© Samuel Fialho',
+    tagline: 'Today we dream. Tomorrow we build.',
+    credits: 'Today we dream. Tomorrow we build.',
+    website: 'https://github.com/semisse/subcat',
+    iconPath: path.join(__dirname, 'assets', 'Icon-iOS-Default-1024x1024@1x.png'),
+});
 
 if (process.env.NODE_ENV === 'development') {
     require('electron-reload')(__dirname, {
@@ -79,7 +90,7 @@ app.whenReady().then(async () => {
         try {
             await auth.fetchUser(token);
             createMainWindow();
-            mainWindow.webContents.once('did-finish-load', () => resumeRuns());
+            mainWindow.webContents.on('did-finish-load', () => resumeRuns());
         } catch {
             auth.clearToken();
             createLoginWindow();
@@ -143,6 +154,26 @@ function resumeRuns() {
 
 app.on('window-all-closed', () => { app.quit(); });
 
+// ─── Auto-update ──────────────────────────────────────────────────────────────
+
+if (process.env.NODE_ENV !== 'development') {
+    autoUpdater.checkForUpdates();
+
+    autoUpdater.on('update-downloaded', () => {
+        dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            buttons: ['Restart', 'Later'],
+            defaultId: 0,
+            cancelId: 1,
+            title: 'Update ready',
+            message: 'A new version of SubCat has been downloaded.',
+            detail: 'Restart the app to apply the update.',
+        }).then(({ response }) => {
+            if (response === 0) autoUpdater.quitAndInstall();
+        });
+    });
+}
+
 app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createLoginWindow();
 });
@@ -193,6 +224,11 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
         return { error: 'Invalid GitHub Actions URL. Expected format: https://github.com/{owner}/{repo}/actions/runs/{run_id}' };
     }
 
+    const repeat = Math.floor(Number(repeatTotal));
+    if (!Number.isFinite(repeat) || repeat < 1 || repeat > 100) {
+        return { error: 'Repeat count must be a number between 1 and 100.' };
+    }
+
     const { owner, repo, runId } = parsed;
 
     if (poller.isActive(runId)) {
@@ -202,7 +238,7 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
     try {
         const initial = await fetchRunStatus(owner, repo, runId, getActiveToken());
 
-        if (initial.status === 'completed' && repeatTotal === 1) {
+        if (initial.status === 'completed' && repeat === 1) {
             return {
                 alreadyDone: true,
                 name: initial.display_title || initial.name,
@@ -226,11 +262,11 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
             workflowId: initial.workflow_id,
             name: initial.display_title || initial.name,
             url: initial.html_url,
-            repeatTotal,
+            repeatTotal: repeat,
             runNumber,
         });
 
-        poller.start({ runId, currentRunId, owner, repo, runNumber, repeatTotal, name: initial.display_title || initial.name, url: initial.html_url }, getActiveToken);
+        poller.start({ runId, currentRunId, owner, repo, runNumber, repeatTotal: repeat, name: initial.display_title || initial.name, url: initial.html_url }, getActiveToken);
 
         return {
             started: true,
@@ -238,11 +274,24 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
             name: initial.display_title || initial.name,
             status: initial.status === 'completed' ? 'queued' : initial.status,
             url: initial.html_url,
-            repeatTotal,
+            repeatTotal: repeat,
         };
     } catch (err) {
         return { error: err.message };
     }
+});
+
+ipcMain.handle('confirm-dialog', async (event, { title, message }) => {
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        buttons: ['Stop & Remove', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        title,
+        message: title,
+        detail: message,
+    });
+    return response === 0;
 });
 
 ipcMain.handle('stop-watching', async (event, runId) => {
@@ -250,11 +299,28 @@ ipcMain.handle('stop-watching', async (event, runId) => {
     return { stopped: true };
 });
 
+ipcMain.handle('cancel-run', async (event, runId) => {
+    const run = db.getRun(runId);
+    if (!run) return { error: 'Run not found.' };
+    try {
+        poller.deactivate(runId);
+        await cancelRun(run.owner, run.repo, run.current_run_id, getActiveToken());
+        db.removeRun(runId);
+        return { cancelled: true };
+    } catch (err) {
+        return { error: err.message };
+    }
+});
+
 ipcMain.handle('open-external', async (event, url) => {
     if (url.startsWith('https://')) shell.openExternal(url);
 });
 
 ipcMain.handle('get-version', () => app.getVersion());
+
+ipcMain.handle('show-about', () => app.showAboutPanel());
+
+ipcMain.handle('refresh-runs', () => resumeRuns());
 
 ipcMain.handle('save-report', async (event, runId) => {
     const report = db.getReport(runId);

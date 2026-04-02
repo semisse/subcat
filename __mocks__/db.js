@@ -4,6 +4,7 @@ module.exports = {
     addRunResult: jest.fn(),
     getActiveRuns: jest.fn(() => []),
     getAllRuns: jest.fn(() => []),
+    getRun: jest.fn(() => null),
     getRunResults: jest.fn(() => []),
     removeRun: jest.fn(),
     getReport: jest.fn(),

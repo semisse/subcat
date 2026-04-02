@@ -79,9 +79,33 @@ function triggerRerun(owner, repo, runId, token) {
     });
 }
 
+function cancelRun(owner, repo, runId, token) {
+    return new Promise((resolve, reject) => {
+        const req = https.request({
+            hostname: 'api.github.com',
+            path: `/repos/${owner}/${repo}/actions/runs/${runId}/cancel`,
+            method: 'POST',
+            headers: {
+                'User-Agent': 'SubCat-Electron',
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${token}`,
+                'Content-Length': 0
+            }
+        }, (res) => {
+            res.on('data', () => {});
+            res.on('end', () => {
+                if (res.statusCode === 202) resolve();
+                else reject(new Error(`Cancel failed: ${res.statusCode}`));
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
 async function rerunWorkflow(owner, repo, runId, token) {
     await triggerRerun(owner, repo, runId, token);
     return runId;
 }
 
-module.exports = { delay, parseGitHubUrl, githubGet, fetchRunStatus, fetchFailedTests, triggerRerun, rerunWorkflow };
+module.exports = { delay, parseGitHubUrl, githubGet, fetchRunStatus, fetchFailedTests, triggerRerun, rerunWorkflow, cancelRun };

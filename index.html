@@ -38,11 +38,11 @@
         }
 
         .header-title img {
-            width: 40px;
+            width: 36px;
         }
 
         .header-title h1 {
-            font-size: 20px;
+            font-size: 26px;
             font-weight: 600;
             color: #fff;
         }
@@ -75,6 +75,37 @@
         .app-version {
             font-size: 10px;
             color: #444;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        .app-version:hover {
+            color: #888;
+        }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            color: #444;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0 2px;
+            line-height: 1;
+            -webkit-app-region: no-drag;
+            transition: color 0.2s, transform 0.3s;
+        }
+
+        .refresh-btn:hover {
+            color: #888;
+        }
+
+        .refresh-btn.spinning {
+            animation: spin 0.6s linear;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .input-section {
@@ -184,7 +215,7 @@
         button.add-btn {
             width: 100%;
             padding: 10px;
-            border: 1px dashed #444;
+            border: 1px dashed white;
             border-radius: 8px;
             font-size: 13px;
             font-weight: 600;
@@ -192,7 +223,7 @@
             transition: all 0.2s;
             -webkit-app-region: no-drag;
             background: none;
-            color: #888;
+            color: white;
         }
 
         button.add-btn:hover {
@@ -295,9 +326,12 @@
         .runs-list {
             margin-top: 20px;
             -webkit-app-region: no-drag;
-            flex: 1;
             overflow-y: auto;
             min-height: 0;
+        }
+
+        .runs-list:not(:empty) {
+            flex: 1;
         }
 
         .run-card {
@@ -381,6 +415,36 @@
             border-color: #888;
         }
 
+        .run-actions .cancel-run-btn {
+            border-color: #444;
+            color: #f39c12;
+        }
+
+        .run-actions .cancel-run-btn:hover {
+            background: rgba(243, 156, 18, 0.1);
+            border-color: #f39c12;
+            color: #f5c96a;
+        }
+
+        .run-actions .cancel-run-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .run-actions .remove-btn {
+            border-color: transparent;
+            font-size: 16px;
+            line-height: 1;
+            padding: 2px 6px;
+            color: #555;
+        }
+
+        .run-actions .remove-btn:hover {
+            color: #e74c3c;
+            border-color: transparent;
+            background: rgba(231, 76, 60, 0.1);
+        }
+
         .run-actions .report-btn {
             border-color: #533483;
             color: #a78bfa;
@@ -393,10 +457,65 @@
         }
 
         .empty-state {
-            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 12px;
+            color: white;
+            opacity: .5;
+            font-size: 13px;
+        }
+
+        .empty-state img {
+            width: 218px;
+            opacity: .75;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .loading-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 10px;
             color: #555;
             font-size: 13px;
-            margin-top: 40px;
+        }
+
+        .loading-state.visible {
+            display: flex;
+            animation: fadeIn 0.25s ease forwards;
+        }
+
+        .loading-state.hiding {
+            animation: fadeOut 0.25s ease forwards;
+        }
+
+        .loading-state img {
+            width: 218px;
+            opacity: .75;
+            pointer-events: none;
+            user-select: none;
+            animation: bounce 0.6s ease-in-out infinite alternate;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
         }
 
         .error-msg {
@@ -413,15 +532,26 @@
 <body>
     <div class="header">
         <div class="header-title">
-            <img src="assets/subcat.png" alt="logo">
+            <img src="assets/little-subcat.png" alt="logo">
             <h1>SubCat</h1>
         </div>
         <div class="header-user">
             <span class="app-version" id="appVersion"></span>
             <img class="auth-avatar" id="authAvatar" src="" alt="">
             <span class="auth-username" id="authUsername"></span>
+            <button class="refresh-btn" id="refreshBtn" title="Refresh runs">↻</button>
             <button class="logout-btn" id="logoutBtn">Logout</button>
         </div>
+    </div>
+
+    <div class="runs-list" id="runsList"></div>
+    <div class="empty-state" id="emptyState">
+        <img src="assets/noresults.png" alt="">
+        <span>No runs being watched.</span>
+    </div>
+    <div class="loading-state" id="loadingState">
+        <img src="assets/subcat-jump.png" alt="">
+        <span>Refreshing…</span>
     </div>
 
     <div class="input-section">
@@ -430,20 +560,17 @@
         <div class="url-form" id="urlForm" style="display:none;">
             <input type="text" id="urlInput" placeholder="https://github.com/owner/repo/actions/runs/123456789" autofocus>
             <div class="url-form-actions">
-                <button class="watch-btn" id="watchBtn">Watch</button>
                 <div class="repeat-field">
                     <span class="repeat-label">×</span>
                     <input type="number" id="repeatInput" value="1" min="1" max="100">
                 </div>
+                <button class="watch-btn" id="watchBtn">Watch</button>
                 <button class="cancel-btn" id="cancelBtn">Cancel</button>
             </div>
         </div>
 
         <div id="errorContainer"></div>
     </div>
-
-    <div class="runs-list" id="runsList"></div>
-    <div class="empty-state" id="emptyState">No runs being watched</div>
 
     <script src="renderer.js"></script>
 </body>

@@ -6,6 +6,7 @@ const watchBtn = document.getElementById('watchBtn');
 const cancelBtn = document.getElementById('cancelBtn');
 const runsList = document.getElementById('runsList');
 const emptyState = document.getElementById('emptyState');
+const loadingState = document.getElementById('loadingState');
 const errorContainer = document.getElementById('errorContainer');
 
 const logoutBtn = document.getElementById('logoutBtn');
@@ -29,6 +30,36 @@ async function initUser() {
         }
     }
 }
+
+appVersion.addEventListener('click', () => window.api.showAbout());
+
+const refreshBtn = document.getElementById('refreshBtn');
+refreshBtn.addEventListener('click', async () => {
+    refreshBtn.classList.add('spinning');
+    refreshBtn.addEventListener('animationend', () => refreshBtn.classList.remove('spinning'), { once: true });
+
+    // clear before refresh so run-restored events populate the fresh list
+    runsList.innerHTML = '';
+    watchedRuns.clear();
+    runsList.style.display = 'none';
+    emptyState.style.display = 'none';
+    loadingState.classList.add('visible');
+
+    await Promise.all([
+        window.api.refreshRuns(),
+        new Promise(r => setTimeout(r, 1000)),
+    ]);
+
+    // extra tick for run-restored events to be processed
+    await new Promise(r => setTimeout(r, 150));
+
+    loadingState.classList.add('hiding');
+    loadingState.addEventListener('animationend', () => {
+        loadingState.classList.remove('visible', 'hiding');
+        runsList.style.display = '';
+        if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+    }, { once: true });
+});
 
 logoutBtn.addEventListener('click', async () => {
     await window.api.authLogout();
@@ -103,12 +134,14 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
     const card = document.createElement('div');
     card.className = `run-card ${getCardClass(status, conclusion)}`;
     card.id = `run-${runId}`;
+    card.dataset.active = status !== 'completed' ? 'true' : 'false';
     card.innerHTML = `
         <div class="run-card-header">
             <div class="run-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
             <div class="run-actions">
                 <button class="open-btn">Open</button>
-                <button class="remove-btn">Remove</button>
+                <button class="cancel-run-btn">Stop</button>
+                <button class="remove-btn" title="Remove">×</button>
             </div>
         </div>
         <div class="run-status">
@@ -119,11 +152,27 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
     `;
 
     card.querySelector('.open-btn').addEventListener('click', () => window.api.openExternal(url));
+    card.querySelector('.cancel-run-btn').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = 'Stopping…';
+        await window.api.cancelRun(runId);
+        card.remove();
+        watchedRuns.delete(runId);
+        if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+    });
     card.querySelector('.remove-btn').addEventListener('click', async () => {
+        if (card.dataset.active === 'true') {
+            const confirmed = await window.api.confirm(
+                'Stop and remove run?',
+                'This run is still active. It will be stopped but not cancelled on GitHub.'
+            );
+            if (!confirmed) return;
+        }
         await window.api.stopWatching(runId);
         card.remove();
         watchedRuns.delete(runId);
-        if (watchedRuns.size === 0) emptyState.style.display = 'block';
+        if (watchedRuns.size === 0) emptyState.style.display = 'flex';
     });
 
     runsList.prepend(card);
@@ -149,6 +198,11 @@ function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTot
     card.className = `run-card ${getCardClass(status, conclusion)}`;
     card.querySelector('.status-dot').className = `status-dot ${status === 'completed' ? conclusion : status}`;
     card.querySelector('.status-text').textContent = formatStatus(status, conclusion);
+
+    if (status === 'completed') {
+        card.dataset.active = 'false';
+        card.querySelector('.cancel-run-btn')?.remove();
+    }
 
     if (name) card.querySelector('.run-name').textContent = name;
 
@@ -184,6 +238,7 @@ window.api.onRunRestored((data) => {
         const conclusion = data.failed === 0 ? 'success' : 'failure';
         addRunCard(data.runId, data.name, 'completed', conclusion, data.url, data.repeatTotal, data.repeatCurrent, data.results);
         const card = document.getElementById(`run-${data.runId}`);
+        card?.querySelector('.cancel-run-btn')?.remove();
         if (card && data.repeatTotal > 1) {
             const reportBtn = document.createElement('button');
             reportBtn.className = 'report-btn';

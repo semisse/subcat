@@ -1,6 +1,10 @@
-const RealDatabase = jest.requireActual('better-sqlite3');
+// Use Node's built-in SQLite (no native compilation needed) for tests.
+// This avoids the NODE_MODULE_VERSION conflict between system Node and Electron.
+const { DatabaseSync } = require('node:sqlite');
 
-// Always use in-memory database in tests — no file system, clean state per module reset
-module.exports = function MemoryDatabase(_path, options) {
-    return new RealDatabase(':memory:', options);
+module.exports = function MemoryDatabase() {
+    const db = new DatabaseSync(':memory:');
+    // better-sqlite3 has a pragma() helper; node:sqlite does not
+    db.pragma = (str) => db.exec(`PRAGMA ${str}`);
+    return db;
 };
