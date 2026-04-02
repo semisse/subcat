@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/subcat.png" width="120" alt="SubCat">
+</p>
+
 # SubCat
 
 A macOS app that monitors GitHub Actions runs and sends native notifications when they finish.
