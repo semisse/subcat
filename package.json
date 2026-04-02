@@ -23,9 +23,7 @@
       "icon": "assets/Icon-iOS-Default-1024x1024@1x.png",
       "category": "public.app-category.developer-tools",
       "identity": "Developer ID Application: Samuel Fialho (49Y5FW82WK)",
-      "notarize": {
-        "teamId": "49Y5FW82WK"
-      }
+      "notarize": true
     },
     "publish": {
       "provider": "github",
