@@ -268,7 +268,11 @@ ipcMain.handle('save-report', async (event, runId) => {
 
     if (!filePath) return { cancelled: true };
 
-    const csv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = v => {
+        const str = String(v ?? '').replace(/"/g, '""');
+        // Prefix with tab to neutralise CSV injection (=, +, -, @, tab, CR)
+        return /^[=+\-@\t\r]/.test(str) ? `"\t${str}"` : `"${str}"`;
+    };
     const header = 'Run #,Result,Failed Tests,Started At,Completed At,URL';
     const rows = report.rows.map(r => [
         r.number,
