@@ -4,6 +4,7 @@ const db = require('./db');
 
 const POLL_INTERVAL_MS = 15_000;
 const TRANSIENT_ERRORS = new Set(['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED']);
+const isTransient = err => TRANSIENT_ERRORS.has(err.code) || err.status === 429;
 
 class PollManager extends EventEmitter {
     #active = new Set();
@@ -109,7 +110,7 @@ class PollManager extends EventEmitter {
                     });
                 }
             } catch (err) {
-                if (TRANSIENT_ERRORS.has(err.code)) continue;
+                if (isTransient(err)) continue;
                 this.#active.delete(runId);
                 db.updateRun(runId, { status: 'error' });
                 this.emit('run:error', { runId, error: err.message });

@@ -24,7 +24,11 @@ function githubGet(path, token) {
             res.on('data', chunk => { data += chunk; });
             res.on('end', () => {
                 if (res.statusCode === 200) resolve(JSON.parse(data));
-                else reject(new Error(`GitHub API ${res.statusCode}: ${path}`));
+                else {
+                    const err = new Error(`GitHub API ${res.statusCode}: ${path}`);
+                    err.status = res.statusCode;
+                    reject(err);
+                }
             });
         });
         req.on('error', reject);

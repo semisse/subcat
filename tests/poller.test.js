@@ -165,4 +165,18 @@ describe('error handling', () => {
 
         expect(onError).not.toHaveBeenCalled();
     });
+
+    test('does not emit run:error on 429 rate limit', async () => {
+        const err = Object.assign(new Error('GitHub API 429: /repos/owner/repo/actions/runs/1'), { status: 429 });
+        github.fetchRunStatus.mockRejectedValueOnce(err).mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        const onError = jest.fn();
+        poller.on('run:error', onError);
+
+        poller.start(makeConfig(), () => 'token');
+        await tick();
+
+        expect(onError).not.toHaveBeenCalled();
+    });
 });
