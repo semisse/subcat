@@ -1,0 +1,35 @@
+# SubCat
+
+A macOS app that monitors GitHub Actions runs and sends native notifications when they finish.
+
+## Install
+
+Download the latest `.dmg` from [Releases](../../releases), open it, and drag SubCat to your Applications folder.
+
+> First launch: macOS may block the app since it's not signed. Right-click → Open to bypass Gatekeeper.
+
+## How it works
+
+1. Log in with your GitHub account (OAuth Device Flow — no password stored)
+2. Paste a GitHub Actions run URL
+3. SubCat polls every 15 seconds and notifies you when the run completes
+4. Click the notification to open the run in your browser
+
+## Features
+
+- Watch multiple runs simultaneously
+- Repeat a run N times to catch flaky tests — get a pass/failure summary at the end
+- Export results to CSV
+- Runs persist across restarts — pick up where you left off
+- Token encrypted via macOS Keychain (`safeStorage`)
+
+## Dev setup
+
+```bash
+npm install
+npm start        # production
+npm run dev      # with hot reload
+npm test         # unit tests
+```
+
+Requires Node 20+ and Xcode Command Line Tools (for native module compilation).

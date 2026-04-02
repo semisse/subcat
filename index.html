@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://avatars.githubusercontent.com">
+    <title>SubCat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 20px;
+            -webkit-app-region: drag;
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-top: 20px;
+        }
+
+        .header-title {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .header-title img {
+            width: 40px;
+        }
+
+        .header-title h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .header-title p {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .header-user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .auth-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: none;
+        }
+
+        .auth-username {
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .app-version {
+            font-size: 10px;
+            color: #444;
+        }
+
+        .input-section {
+            -webkit-app-region: no-drag;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #16213e;
+            color: #e0e0e0;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"]:focus {
+            border-color: #0f3460;
+        }
+
+        input::placeholder {
+            color: #666;
+        }
+
+        .auth-section {
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 16px;
+            -webkit-app-region: no-drag;
+        }
+
+        .auth-logged-out { display: flex; flex-direction: column; gap: 10px; }
+
+        .auth-logged-in {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+
+        button.github-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            -webkit-app-region: no-drag;
+            background: #238636;
+            color: #fff;
+        }
+
+        button.github-btn:hover {
+            background: #2ea043;
+        }
+
+        button.github-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.logout-btn {
+            padding: 6px 12px;
+            border: 1px solid #444;
+            border-radius: 6px;
+            background: none;
+            color: #aaa;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        button.logout-btn:hover {
+            color: #fff;
+            border-color: #888;
+        }
+
+        .device-code-box {
+            background: #0d1b36;
+            border: 1px dashed #533483;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .device-code {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: #fff;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            margin: 8px 0;
+        }
+
+        .device-code-hint {
+            font-size: 11px;
+            color: #888;
+        }
+
+
+        button.add-btn {
+            width: 100%;
+            padding: 10px;
+            border: 1px dashed #444;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            -webkit-app-region: no-drag;
+            background: none;
+            color: #888;
+        }
+
+        button.add-btn:hover {
+            border-color: #888;
+            color: #e0e0e0;
+        }
+
+        .url-form-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 0;
+            align-items: center;
+        }
+
+        .repeat-field {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 0 10px;
+            background: #16213e;
+        }
+
+        .repeat-label {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .repeat-field input[type="number"] {
+            width: 44px;
+            background: none;
+            border: none;
+            color: #e0e0e0;
+            font-size: 13px;
+            padding: 10px 0;
+            margin: 0;
+            text-align: center;
+            -moz-appearance: textfield;
+        }
+
+        .repeat-field input[type="number"]::-webkit-outer-spin-button,
+        .repeat-field input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+        }
+
+        .run-repeat {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .run-results {
+            display: inline-flex;
+            gap: 6px;
+            margin-left: 8px;
+            font-size: 11px;
+        }
+
+        button.watch-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: linear-gradient(135deg, #0f3460, #533483);
+            color: #fff;
+        }
+
+        button.watch-btn:hover {
+            box-shadow: 0 4px 12px rgba(83, 52, 131, 0.4);
+        }
+
+        button.watch-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        button.cancel-btn {
+            padding: 10px 16px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            background: none;
+            color: #888;
+            transition: all 0.2s;
+        }
+
+        button.cancel-btn:hover {
+            border-color: #888;
+            color: #e0e0e0;
+        }
+
+        .runs-list {
+            margin-top: 20px;
+            -webkit-app-region: no-drag;
+        }
+
+        .run-card {
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            position: relative;
+            transition: border-color 0.3s;
+        }
+
+        .run-card.completed-success { border-color: #2ecc71; }
+        .run-card.completed-failure { border-color: #e74c3c; }
+        .run-card.in-progress { border-color: #f39c12; }
+
+        .run-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 6px;
+            padding-right: 60px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .run-status {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.in_progress, .status-dot.queued, .status-dot.waiting, .status-dot.pending {
+            background: #f39c12;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.success { background: #2ecc71; }
+        .status-dot.failure, .status-dot.cancelled, .status-dot.timed_out { background: #e74c3c; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .run-actions {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            gap: 6px;
+        }
+
+        .run-actions button {
+            background: none;
+            border: 1px solid #444;
+            color: #aaa;
+            border-radius: 6px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .run-actions button:hover {
+            color: #fff;
+            border-color: #888;
+        }
+
+        .run-actions .report-btn {
+            border-color: #533483;
+            color: #a78bfa;
+        }
+
+        .run-actions .report-btn:hover {
+            background: rgba(83, 52, 131, 0.2);
+            border-color: #a78bfa;
+            color: #c4b5fd;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #555;
+            font-size: 13px;
+            margin-top: 40px;
+        }
+
+        .error-msg {
+            background: rgba(231, 76, 60, 0.15);
+            border: 1px solid rgba(231, 76, 60, 0.3);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #e74c3c;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-title">
+            <img src="assets/subcat.png" alt="logo">
+            <h1>SubCat</h1>
+        </div>
+        <div class="header-user">
+            <span class="app-version" id="appVersion"></span>
+            <img class="auth-avatar" id="authAvatar" src="" alt="">
+            <span class="auth-username" id="authUsername"></span>
+            <button class="logout-btn" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <div class="input-section">
+        <button class="add-btn" id="addBtn">+ Watch Run</button>
+
+        <div class="url-form" id="urlForm" style="display:none;">
+            <input type="text" id="urlInput" placeholder="https://github.com/owner/repo/actions/runs/123456789" autofocus>
+            <div class="url-form-actions">
+                <button class="watch-btn" id="watchBtn">Watch</button>
+                <div class="repeat-field">
+                    <span class="repeat-label">×</span>
+                    <input type="number" id="repeatInput" value="1" min="1" max="100">
+                </div>
+                <button class="cancel-btn" id="cancelBtn">Cancel</button>
+            </div>
+        </div>
+
+        <div id="errorContainer"></div>
+    </div>
+
+    <div class="runs-list" id="runsList"></div>
+    <div class="empty-state" id="emptyState">No runs being watched</div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
