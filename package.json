@@ -1,14 +1,15 @@
 {
   "name": "subcat",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Get notified when a GitHub Actions CI run finishes",
+  "author": "Samuel Fialho",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
     "test": "jest",
     "build:mac": "electron-builder --mac --config.mac.target=dmg",
-    "postinstall": "electron-rebuild && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist"
+    "postinstall": "electron-builder install-app-deps && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist"
   },
   "build": {
     "appId": "com.samuelfialho.subcat",
@@ -31,11 +32,10 @@
     ]
   },
   "dependencies": {
-    "better-sqlite3": "^12.8.0",
-    "electron": "^35.0.0"
+    "better-sqlite3": "^12.8.0"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.3",
+    "electron": "^35.0.0",
     "electron-builder": "^25.0.0",
     "electron-reload": "^2.0.0-alpha.1",
     "jest": "^30.3.0"
