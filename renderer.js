@@ -104,15 +104,17 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
     card.className = `run-card ${getCardClass(status, conclusion)}`;
     card.id = `run-${runId}`;
     card.innerHTML = `
-        <div class="run-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+        <div class="run-card-header">
+            <div class="run-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+            <div class="run-actions">
+                <button class="open-btn">Open</button>
+                <button class="remove-btn">Remove</button>
+            </div>
+        </div>
         <div class="run-status">
             <span class="status-dot ${status === 'completed' ? conclusion : status}"></span>
             <span class="status-text">${formatStatus(status, conclusion)}</span>
             ${repeatTotal > 1 ? `<span class="run-repeat">${escapeHtml(repeatLabel)}</span>` : ''}
-        </div>
-        <div class="run-actions">
-            <button class="open-btn">Open</button>
-            <button class="remove-btn">Remove</button>
         </div>
     `;
 
