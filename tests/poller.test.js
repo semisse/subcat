@@ -1,0 +1,168 @@
+let poller, github, db;
+
+beforeEach(() => {
+    jest.resetModules();
+    jest.mock('../github');
+    jest.mock('../db');
+    github = require('../github');
+    db = require('../db');
+    github.delay.mockResolvedValue(undefined);
+    poller = require('../poller');
+});
+
+function makeRun(overrides = {}) {
+    return {
+        status: 'completed',
+        conclusion: 'success',
+        display_title: 'My Run',
+        name: 'My Run',
+        html_url: 'https://github.com/owner/repo/actions/runs/1',
+        run_started_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:01:00Z',
+        ...overrides,
+    };
+}
+
+function makeConfig(overrides = {}) {
+    return {
+        runId: '1', currentRunId: '1',
+        owner: 'owner', repo: 'repo',
+        runNumber: 1, repeatTotal: 1,
+        name: 'My Run',
+        url: 'https://github.com/owner/repo/actions/runs/1',
+        ...overrides,
+    };
+}
+
+const tick = () => new Promise(r => setImmediate(r));
+
+// ─── start / stop ─────────────────────────────────────────────────────────────
+
+describe('start / stop', () => {
+    test('returns true on first start, false if already watching', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        expect(poller.start(makeConfig(), () => 'token')).toBe(true);
+        expect(poller.start(makeConfig(), () => 'token')).toBe(false);
+        await tick(); // let loop finish cleanly
+    });
+
+    test('stop removes run from active and calls db.removeRun', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        poller.start(makeConfig(), () => 'token');
+        poller.stop('1'); // synchronous — before loop first tick
+        expect(poller.isActive('1')).toBe(false);
+        expect(db.removeRun).toHaveBeenCalledWith('1');
+        await tick();
+    });
+});
+
+// ─── single run ───────────────────────────────────────────────────────────────
+
+describe('single run completes', () => {
+    test('emits run:update, run:repeat-done, run:all-done', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        const updates = [];
+        const repeatDone = jest.fn();
+        const allDone = jest.fn();
+        poller.on('run:update', d => updates.push(d));
+        poller.on('run:repeat-done', repeatDone);
+        poller.on('run:all-done', allDone);
+
+        poller.start(makeConfig(), () => 'token');
+        await tick();
+
+        expect(updates.length).toBeGreaterThan(0);
+        expect(repeatDone).toHaveBeenCalledWith(expect.objectContaining({ runId: '1', conclusion: 'success' }));
+        expect(allDone).toHaveBeenCalledWith(expect.objectContaining({ runId: '1', passed: 1, failed: 0 }));
+    });
+
+    test('marks run as completed in db', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        poller.start(makeConfig(), () => 'token');
+        await tick();
+
+        expect(db.updateRun).toHaveBeenCalledWith('1', { status: 'completed' });
+    });
+
+    test('run is no longer active after completion', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        poller.start(makeConfig(), () => 'token');
+        await tick();
+
+        expect(poller.isActive('1')).toBe(false);
+    });
+});
+
+// ─── repeat runs ─────────────────────────────────────────────────────────────
+
+describe('repeat runs', () => {
+    test('triggers rerun and increments runNumber when repeatTotal > 1', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+        github.rerunWorkflow.mockResolvedValue('1');
+
+        const allDone = jest.fn();
+        poller.on('run:all-done', allDone);
+
+        poller.start(makeConfig({ repeatTotal: 2 }), () => 'token');
+        await tick();
+
+        expect(github.rerunWorkflow).toHaveBeenCalledTimes(1);
+        expect(db.updateRun).toHaveBeenCalledWith('1', { runNumber: 2 });
+        expect(allDone).toHaveBeenCalledWith(expect.objectContaining({ passed: 2, failed: 0 }));
+    });
+
+    test('run:all-done reflects failures in results', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun({ conclusion: 'failure' }));
+        github.fetchFailedTests.mockResolvedValue(['Test A failed']);
+        github.rerunWorkflow.mockResolvedValue('1');
+
+        const allDone = jest.fn();
+        poller.on('run:all-done', allDone);
+
+        poller.start(makeConfig({ repeatTotal: 2 }), () => 'token');
+        await tick();
+
+        expect(allDone).toHaveBeenCalledWith(expect.objectContaining({ passed: 0, failed: 2 }));
+    });
+});
+
+// ─── error handling ───────────────────────────────────────────────────────────
+
+describe('error handling', () => {
+    test('emits run:error on non-transient failure', async () => {
+        github.fetchRunStatus.mockRejectedValue(new Error('Unexpected server error'));
+
+        const onError = jest.fn();
+        poller.on('run:error', onError);
+
+        poller.start(makeConfig(), () => 'token');
+        await tick();
+
+        expect(onError).toHaveBeenCalledWith(expect.objectContaining({ runId: '1', error: 'Unexpected server error' }));
+    });
+
+    test('does not emit run:error on transient network failure', async () => {
+        const err = Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' });
+        github.fetchRunStatus.mockRejectedValueOnce(err).mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        const onError = jest.fn();
+        poller.on('run:error', onError);
+
+        poller.start(makeConfig(), () => 'token');
+        await tick();
+
+        expect(onError).not.toHaveBeenCalled();
+    });
+});

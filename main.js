@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, Notification, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const auth = require('./auth');
-const { delay, parseGitHubUrl, fetchRunStatus, fetchFailedTests, rerunWorkflow } = require('./github');
+const { parseGitHubUrl, fetchRunStatus, rerunWorkflow } = require('./github');
 const db = require('./db');
+const poller = require('./poller');
 
 app.setName('SubCat');
 
@@ -40,6 +41,37 @@ function createMainWindow() {
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+function getActiveToken() {
+    return auth.loadToken() || undefined;
+}
+
+// ─── Poller events → IPC + notifications ─────────────────────────────────────
+
+poller.on('run:update', (data) => {
+    mainWindow?.webContents.send('run-update', data);
+});
+
+poller.on('run:repeat-done', ({ runId, runNumber, conclusion, name, url, repeatTotal }) => {
+    const emoji = conclusion === 'success' ? '✅' : '❌';
+    const label = repeatTotal > 1 ? `Run ${runNumber}/${repeatTotal}` : name;
+    const notification = new Notification({
+        title: `${emoji} ${label}`,
+        body: repeatTotal > 1 ? `${name} · ${conclusion}` : conclusion,
+    });
+    notification.on('click', () => shell.openExternal(url));
+    notification.show();
+});
+
+poller.on('run:all-done', ({ runId, repeatTotal, passed, failed }) => {
+    mainWindow?.webContents.send('run-report-ready', { runId, repeatTotal, passed, failed });
+});
+
+poller.on('run:error', (data) => {
+    mainWindow?.webContents.send('run-error', data);
+});
+
+// ─── App lifecycle ────────────────────────────────────────────────────────────
+
 app.whenReady().then(async () => {
     app.dock?.setIcon(appIcon);
     const token = auth.loadToken();
@@ -47,7 +79,7 @@ app.whenReady().then(async () => {
         try {
             await auth.fetchUser(token);
             createMainWindow();
-            mainWindow.webContents.once('did-finish-load', () => resumeActiveRuns());
+            mainWindow.webContents.once('did-finish-load', () => resumeRuns());
         } catch {
             auth.clearToken();
             createLoginWindow();
@@ -57,9 +89,8 @@ app.whenReady().then(async () => {
     }
 });
 
-function resumeActiveRuns() {
-    const allRuns = db.getAllRuns();
-    for (const run of allRuns) {
+function resumeRuns() {
+    for (const run of db.getAllRuns()) {
         const runResults = db.getRunResults(run.id);
         const results = runResults.map(r => r.conclusion);
 
@@ -72,7 +103,7 @@ function resumeActiveRuns() {
                 completed_at: r.completed_at,
                 failedTests: r.failedTests,
             }));
-            startPollLoop({
+            poller.start({
                 runId: run.id,
                 currentRunId: run.current_run_id,
                 owner: run.owner,
@@ -83,7 +114,7 @@ function resumeActiveRuns() {
                 url: run.url,
                 results,
                 reportRows,
-            });
+            }, getActiveToken);
             mainWindow?.webContents.send('run-restored', {
                 runId: run.id,
                 name: run.name,
@@ -110,22 +141,13 @@ function resumeActiveRuns() {
     }
 }
 
-app.on('window-all-closed', () => {
-    app.quit();
-});
+app.on('window-all-closed', () => { app.quit(); });
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createLoginWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createLoginWindow();
 });
 
-const activePolls = new Set();
-const completedReports = new Map();
-
-function getActiveToken() {
-    return auth.loadToken() || undefined;
-}
+// ─── IPC handlers ─────────────────────────────────────────────────────────────
 
 ipcMain.handle('auth-get-status', async () => {
     const token = auth.loadToken();
@@ -143,7 +165,6 @@ ipcMain.handle('auth-start-login', async () => {
     try {
         const flow = await auth.startDeviceFlow();
         shell.openExternal(flow.verificationUri);
-
         auth.pollForToken(flow.deviceCode, flow.interval)
             .then(async (token) => {
                 auth.storeToken(token);
@@ -153,7 +174,6 @@ ipcMain.handle('auth-start-login', async () => {
             .catch((err) => {
                 loginWindow?.webContents.send('auth-error', { error: err.message });
             });
-
         return { userCode: flow.userCode, verificationUri: flow.verificationUri };
     } catch (err) {
         return { error: err.message };
@@ -167,93 +187,6 @@ ipcMain.handle('auth-logout', async () => {
     return { ok: true };
 });
 
-function startPollLoop({ runId, currentRunId: initialCurrentRunId, owner, repo, runNumber: initialRunNumber, repeatTotal, name: initialName, url: initialUrl, results: initialResults = [], reportRows: initialReportRows = [] }) {
-    activePolls.add(runId);
-
-    (async () => {
-        let currentRunId = initialCurrentRunId;
-        let runNumber = initialRunNumber;
-        const results = [...initialResults];
-        const reportRows = [...initialReportRows];
-
-        while (activePolls.has(runId)) {
-            await delay(15000);
-            if (!activePolls.has(runId)) break;
-
-            try {
-                const run = await fetchRunStatus(owner, repo, currentRunId, getActiveToken());
-
-                mainWindow?.webContents.send('run-update', {
-                    runId,
-                    status: run.status,
-                    conclusion: run.conclusion,
-                    name: run.display_title || run.name,
-                    url: run.html_url,
-                    repeatCurrent: runNumber,
-                    repeatTotal,
-                    results
-                });
-
-                if (run.status === 'completed') {
-                    results.push(run.conclusion);
-                    const failedTests = run.conclusion !== 'success'
-                        ? await fetchFailedTests(owner, repo, currentRunId, getActiveToken()).catch(() => [])
-                        : [];
-
-                    const row = {
-                        number: runNumber,
-                        conclusion: run.conclusion,
-                        url: run.html_url,
-                        started_at: run.run_started_at,
-                        completed_at: run.updated_at,
-                        failedTests,
-                    };
-                    reportRows.push(row);
-                    db.addRunResult({ runId, number: runNumber, conclusion: run.conclusion, url: run.html_url, startedAt: run.run_started_at, completedAt: run.updated_at, failedTests });
-
-                    const emoji = run.conclusion === 'success' ? '✅' : '❌';
-                    const runLabel = repeatTotal > 1 ? `Run ${runNumber}/${repeatTotal}` : (run.display_title || run.name);
-                    const notification = new Notification({
-                        title: `${emoji} ${runLabel}`,
-                        body: repeatTotal > 1 ? `${run.display_title || run.name} · ${run.conclusion}` : run.conclusion,
-                    });
-                    notification.on('click', () => shell.openExternal(run.html_url));
-                    notification.show();
-
-                    if (runNumber < repeatTotal) {
-                        currentRunId = await rerunWorkflow(owner, repo, currentRunId, getActiveToken());
-                        runNumber++;
-                        db.updateRun(runId, { currentRunId, runNumber });
-
-                        const newRun = await fetchRunStatus(owner, repo, currentRunId, getActiveToken()).catch(() => null);
-                        mainWindow?.webContents.send('run-update', {
-                            runId,
-                            status: newRun?.status ?? 'queued',
-                            conclusion: newRun?.conclusion ?? null,
-                            name: run.display_title || run.name,
-                            url: newRun?.html_url ?? run.html_url,
-                            repeatCurrent: runNumber,
-                            repeatTotal,
-                            results
-                        });
-                    } else {
-                        activePolls.delete(runId);
-                        db.updateRun(runId, { status: 'completed' });
-                        completedReports.set(runId, { name: run.display_title || run.name, rows: reportRows });
-                        const passed = results.filter(r => r === 'success').length;
-                        mainWindow?.webContents.send('run-report-ready', { runId, repeatTotal, passed, failed: repeatTotal - passed });
-                    }
-                }
-            } catch (err) {
-                const transient = ['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED'].includes(err.code);
-                if (!transient) {
-                    mainWindow?.webContents.send('run-error', { runId, error: err.message });
-                }
-            }
-        }
-    })();
-}
-
 ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
     const parsed = parseGitHubUrl(url);
     if (!parsed) {
@@ -262,7 +195,7 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
 
     const { owner, repo, runId } = parsed;
 
-    if (activePolls.has(runId)) {
+    if (poller.isActive(runId)) {
         return { error: 'Already watching this run.' };
     }
 
@@ -274,7 +207,7 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
                 alreadyDone: true,
                 name: initial.display_title || initial.name,
                 conclusion: initial.conclusion,
-                url: initial.html_url
+                url: initial.html_url,
             };
         }
 
@@ -282,7 +215,7 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
         let runNumber = 1;
 
         if (initial.status === 'completed') {
-            currentRunId = await rerunWorkflow(owner, repo, runId, getActiveToken());
+            await rerunWorkflow(owner, repo, runId, getActiveToken());
         }
 
         db.addRun({
@@ -297,7 +230,7 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
             runNumber,
         });
 
-        startPollLoop({ runId, currentRunId, owner, repo, runNumber, repeatTotal, name: initial.display_title || initial.name, url: initial.html_url });
+        poller.start({ runId, currentRunId, owner, repo, runNumber, repeatTotal, name: initial.display_title || initial.name, url: initial.html_url }, getActiveToken);
 
         return {
             started: true,
@@ -305,7 +238,7 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
             name: initial.display_title || initial.name,
             status: initial.status === 'completed' ? 'queued' : initial.status,
             url: initial.html_url,
-            repeatTotal
+            repeatTotal,
         };
     } catch (err) {
         return { error: err.message };
@@ -313,8 +246,7 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
 });
 
 ipcMain.handle('stop-watching', async (event, runId) => {
-    activePolls.delete(runId);
-    db.removeRun(runId);
+    poller.stop(runId);
     return { stopped: true };
 });
 
@@ -325,13 +257,13 @@ ipcMain.handle('open-external', async (event, url) => {
 ipcMain.handle('get-version', () => app.getVersion());
 
 ipcMain.handle('save-report', async (event, runId) => {
-    const report = completedReports.get(runId) ?? db.getReport(runId);
+    const report = db.getReport(runId);
     if (!report) return { error: 'No report available.' };
 
     const { filePath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Save Run Report',
         defaultPath: `subcat-report-${runId}.csv`,
-        filters: [{ name: 'CSV', extensions: ['csv'] }]
+        filters: [{ name: 'CSV', extensions: ['csv'] }],
     });
 
     if (!filePath) return { cancelled: true };
@@ -344,7 +276,7 @@ ipcMain.handle('save-report', async (event, runId) => {
         r.failedTests?.length ? csv(r.failedTests.join(' | ')) : '-',
         csv(r.started_at ?? ''),
         csv(r.completed_at ?? ''),
-        csv(r.url)
+        csv(r.url),
     ].join(','));
     require('fs').writeFileSync(filePath, [header, ...rows].join('\n'), 'utf8');
 
