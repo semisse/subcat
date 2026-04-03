@@ -38,7 +38,7 @@
         }
 
         .header-title img {
-            width: 36px;
+            width: 34px;
         }
 
         .header-title h1 {
@@ -73,6 +73,7 @@
         }
 
         .app-version {
+            margin-top: 3px;
             font-size: 10px;
             color: #444;
             cursor: pointer;
@@ -569,6 +570,57 @@
             to { opacity: 0; }
         }
 
+        .pr-picker {
+            margin-bottom: 10px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .pr-picker-label {
+            padding: 7px 12px 5px;
+            font-size: 11px;
+            color: #555;
+            border-bottom: 1px solid #222;
+        }
+
+        .pr-picker-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid #222;
+        }
+
+        .pr-picker-item:last-child {
+            border-bottom: none;
+        }
+
+        .pr-picker-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .pr-picker-item.selected {
+            background: rgba(83, 52, 131, 0.2);
+        }
+
+        .pr-picker-name {
+            flex: 1;
+            font-size: 12px;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pr-picker-status {
+            font-size: 11px;
+            color: #666;
+            flex-shrink: 0;
+        }
+
         .error-msg {
             background: rgba(231, 76, 60, 0.15);
             border: 1px solid rgba(231, 76, 60, 0.3);
@@ -609,7 +661,8 @@
         <button class="add-btn" id="addBtn">+ Watch Run</button>
 
         <div class="url-form" id="urlForm" style="display:none;">
-            <input type="text" id="urlInput" placeholder="https://github.com/owner/repo/actions/runs/123456789" autofocus>
+            <input type="text" id="urlInput" placeholder="https://github.com/owner/repo/actions/runs/… or /pull/…" autofocus>
+            <div id="prPicker" class="pr-picker" style="display:none;"></div>
             <div class="url-form-actions">
                 <div class="repeat-field">
                     <span class="repeat-label">×</span>

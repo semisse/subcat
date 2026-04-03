@@ -8,6 +8,36 @@ function parseGitHubUrl(url) {
     return { owner: match[1], repo: match[2], runId: match[3] };
 }
 
+function parsePRUrl(url) {
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (!match) return null;
+    return { owner: match[1], repo: match[2], prNumber: match[3] };
+}
+
+async function fetchPRRuns(owner, repo, prNumber, token) {
+    const pr = await githubGet(`/repos/${owner}/${repo}/pulls/${prNumber}`, token);
+    const { workflow_runs } = await githubGet(
+        `/repos/${owner}/${repo}/actions/runs?head_sha=${pr.head.sha}&per_page=30`,
+        token
+    );
+    // deduplicate: one entry per workflow (API returns newest first)
+    const seen = new Set();
+    const unique = [];
+    for (const r of workflow_runs) {
+        if (!seen.has(r.workflow_id)) {
+            seen.add(r.workflow_id);
+            unique.push({
+                runId: String(r.id),
+                name: r.name,
+                status: r.status,
+                conclusion: r.conclusion,
+                url: r.html_url,
+            });
+        }
+    }
+    return unique;
+}
+
 function githubGet(path, token) {
     return new Promise((resolve, reject) => {
         const req = https.request({
@@ -48,11 +78,16 @@ async function fetchFailedTests(owner, repo, runId, token) {
         failedJobs.map(job => githubGet(`/repos/${owner}/${repo}/check-runs/${job.id}/annotations`, token))
     );
 
-    return allAnnotations
+    const useful = allAnnotations
         .flat()
-        .filter(a => a.annotation_level === 'failure')
+        .filter(a => a.annotation_level === 'failure' && a.path !== '.github')
         .map(a => a.title || a.message?.split('\n')[0])
-        .filter(Boolean);
+        .filter(t => t && !/process completed with exit code/i.test(t));
+
+    if (useful.length > 0) return useful;
+
+    // fall back to failed job names
+    return failedJobs.map(j => j.name);
 }
 
 function triggerRerun(owner, repo, runId, token) {
@@ -132,4 +167,4 @@ function rerunFailedJobs(owner, repo, runId, token) {
     });
 }
 
-module.exports = { delay, parseGitHubUrl, githubGet, fetchRunStatus, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };
+module.exports = { delay, parseGitHubUrl, parsePRUrl, githubGet, fetchRunStatus, fetchPRRuns, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

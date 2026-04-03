@@ -1,6 +1,6 @@
 jest.mock('https');
 const https = require('https');
-const { parseGitHubUrl, githubGet, fetchFailedTests, rerunWorkflow, cancelRun } = require('../github');
+const { parseGitHubUrl, parsePRUrl, githubGet, fetchFailedTests, fetchPRRuns, rerunWorkflow, rerunFailedJobs, cancelRun } = require('../github');
 
 // Helper to create a mock https response
 function mockResponse(statusCode, body) {
@@ -38,6 +38,23 @@ describe('parseGitHubUrl', () => {
 
     test('returns null for empty string', () => {
         expect(parseGitHubUrl('')).toBeNull();
+    });
+});
+
+// ─── parsePRUrl ───────────────────────────────────────────────────────────────
+
+describe('parsePRUrl', () => {
+    test('parses a valid PR URL', () => {
+        const result = parsePRUrl('https://github.com/Alfresco/hxp-frontend-apps/pull/16230');
+        expect(result).toEqual({ owner: 'Alfresco', repo: 'hxp-frontend-apps', prNumber: '16230' });
+    });
+
+    test('returns null for a run URL', () => {
+        expect(parsePRUrl('https://github.com/owner/repo/actions/runs/123')).toBeNull();
+    });
+
+    test('returns null for empty string', () => {
+        expect(parsePRUrl('')).toBeNull();
     });
 });
 
@@ -153,6 +170,87 @@ describe('cancelRun', () => {
     });
 });
 
+// ─── rerunFailedJobs ─────────────────────────────────────────────────────────
+
+describe('rerunFailedJobs', () => {
+    beforeEach(() => https.request.mockClear());
+
+    function mockPostResponse(statusCode) {
+        const EventEmitter = require('events');
+        const res = new EventEmitter();
+        res.statusCode = statusCode;
+        const req = new EventEmitter();
+        req.end = jest.fn(() => res.emit('end'));
+        https.request.mockImplementationOnce((_, cb) => { cb(res); return req; });
+    }
+
+    test('resolves on 201', async () => {
+        mockPostResponse(201);
+        await expect(rerunFailedJobs('owner', 'repo', '99', 'token')).resolves.toBeUndefined();
+    });
+
+    test('sends POST to rerun-failed-jobs endpoint', async () => {
+        mockPostResponse(201);
+        await rerunFailedJobs('owner', 'repo', '99', 'token');
+        expect(https.request).toHaveBeenCalledWith(
+            expect.objectContaining({ method: 'POST', path: '/repos/owner/repo/actions/runs/99/rerun-failed-jobs' }),
+            expect.any(Function)
+        );
+    });
+
+    test('rejects on non-201', async () => {
+        mockPostResponse(403);
+        await expect(rerunFailedJobs('owner', 'repo', '99', 'token')).rejects.toThrow('Rerun failed jobs: 403');
+    });
+});
+
+// ─── fetchPRRuns ──────────────────────────────────────────────────────────────
+
+describe('fetchPRRuns', () => {
+    function mockGetSequence(...responses) {
+        for (const [statusCode, body] of responses) {
+            const EventEmitter = require('events');
+            const res = new EventEmitter();
+            res.statusCode = statusCode;
+            const req = new EventEmitter();
+            req.end = jest.fn(() => {
+                res.emit('data', JSON.stringify(body));
+                res.emit('end');
+            });
+            https.request.mockImplementationOnce((_, cb) => { cb(res); return req; });
+        }
+    }
+
+    test('returns deduplicated runs by workflow_id', async () => {
+        mockGetSequence(
+            [200, { head: { sha: 'abc123' } }],
+            [200, { workflow_runs: [
+                { id: 1, workflow_id: 10, name: 'CI', status: 'completed', conclusion: 'failure', html_url: 'https://github.com/o/r/actions/runs/1' },
+                { id: 2, workflow_id: 10, name: 'CI', status: 'completed', conclusion: 'success', html_url: 'https://github.com/o/r/actions/runs/2' },
+                { id: 3, workflow_id: 20, name: 'Lint', status: 'in_progress', conclusion: null, html_url: 'https://github.com/o/r/actions/runs/3' },
+            ]}]
+        );
+        const result = await fetchPRRuns('owner', 'repo', '42', 'token');
+        expect(result).toHaveLength(2);
+        expect(result[0]).toMatchObject({ runId: '1', name: 'CI', status: 'completed', conclusion: 'failure' });
+        expect(result[1]).toMatchObject({ runId: '3', name: 'Lint', status: 'in_progress' });
+    });
+
+    test('returns empty array when no runs exist for PR', async () => {
+        mockGetSequence(
+            [200, { head: { sha: 'abc123' } }],
+            [200, { workflow_runs: [] }]
+        );
+        const result = await fetchPRRuns('owner', 'repo', '42', 'token');
+        expect(result).toEqual([]);
+    });
+
+    test('rejects when PR fetch fails', async () => {
+        mockGetSequence([404, { message: 'Not Found' }]);
+        await expect(fetchPRRuns('owner', 'repo', '999', 'token')).rejects.toThrow('GitHub API 404');
+    });
+});
+
 // ─── fetchFailedTests ─────────────────────────────────────────────────────────
 
 describe('fetchFailedTests', () => {
@@ -193,5 +291,73 @@ describe('fetchFailedTests', () => {
         mockResponse(200, { jobs: [{ id: 101, conclusion: 'success' }] });
         const result = await fetchFailedTests('owner', 'repo', '123', 'token');
         expect(result).toEqual([]);
+    });
+
+    test('filters out generic "Process completed with exit code" annotations', async () => {
+        https.request
+            .mockImplementationOnce((_, cb) => {
+                const EventEmitter = require('events');
+                const res = new EventEmitter();
+                res.statusCode = 200;
+                const req = new EventEmitter();
+                req.end = jest.fn(() => {
+                    res.emit('data', JSON.stringify({ jobs: [{ id: 10, name: 'Run tests', conclusion: 'failure' }] }));
+                    res.emit('end');
+                });
+                cb(res); return req;
+            })
+            .mockImplementationOnce((_, cb) => {
+                const EventEmitter = require('events');
+                const res = new EventEmitter();
+                res.statusCode = 200;
+                const req = new EventEmitter();
+                req.end = jest.fn(() => {
+                    res.emit('data', JSON.stringify([
+                        { annotation_level: 'failure', path: '.github', title: 'Process completed with exit code 1.' },
+                    ]));
+                    res.emit('end');
+                });
+                cb(res); return req;
+            });
+
+        const result = await fetchFailedTests('owner', 'repo', '123', 'token');
+        expect(result).toEqual(['Run tests']);
+    });
+
+    test('falls back to failed job names when no useful annotations exist', async () => {
+        https.request
+            .mockImplementationOnce((_, cb) => {
+                const EventEmitter = require('events');
+                const res = new EventEmitter();
+                res.statusCode = 200;
+                const req = new EventEmitter();
+                req.end = jest.fn(() => {
+                    res.emit('data', JSON.stringify({ jobs: [
+                        { id: 10, name: 'Build', conclusion: 'failure' },
+                        { id: 11, name: 'Deploy', conclusion: 'failure' },
+                    ]}));
+                    res.emit('end');
+                });
+                cb(res); return req;
+            })
+            .mockImplementationOnce((_, cb) => {
+                const EventEmitter = require('events');
+                const res = new EventEmitter();
+                res.statusCode = 200;
+                const req = new EventEmitter();
+                req.end = jest.fn(() => { res.emit('data', JSON.stringify([])); res.emit('end'); });
+                cb(res); return req;
+            })
+            .mockImplementationOnce((_, cb) => {
+                const EventEmitter = require('events');
+                const res = new EventEmitter();
+                res.statusCode = 200;
+                const req = new EventEmitter();
+                req.end = jest.fn(() => { res.emit('data', JSON.stringify([])); res.emit('end'); });
+                cb(res); return req;
+            });
+
+        const result = await fetchFailedTests('owner', 'repo', '123', 'token');
+        expect(result).toEqual(['Build', 'Deploy']);
     });
 });

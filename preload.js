@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
     startWatching: (data) => ipcRenderer.invoke('start-watching', data),
+    fetchPRRuns: (url) => ipcRenderer.invoke('fetch-pr-runs', url),
     stopWatching: (runId) => ipcRenderer.invoke('stop-watching', runId),
     confirm: (title, message) => ipcRenderer.invoke('confirm-dialog', { title, message }),
     cancelRun: (runId) => ipcRenderer.invoke('cancel-run', runId),

@@ -125,6 +125,27 @@ describe('getAllRuns', () => {
     });
 });
 
+// ─── getRun ───────────────────────────────────────────────────────────────────
+
+describe('getRun', () => {
+    test('returns null for an unknown id', () => {
+        expect(db.getRun('nonexistent')).toBeNull();
+    });
+
+    test('returns the run when it exists', () => {
+        db.addRun(RUN);
+        const run = db.getRun('1');
+        expect(run).not.toBeNull();
+        expect(run.id).toBe('1');
+        expect(run.owner).toBe('owner');
+    });
+
+    test('throws on duplicate id (UNIQUE constraint)', () => {
+        db.addRun(RUN);
+        expect(() => db.addRun(RUN)).toThrow(/UNIQUE constraint failed/);
+    });
+});
+
 // ─── removeRun ────────────────────────────────────────────────────────────────
 
 describe('removeRun', () => {

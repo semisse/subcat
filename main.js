@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, Notification, nativeImage, shell, dialog } 
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const auth = require('./auth');
-const { parseGitHubUrl, fetchRunStatus, rerunWorkflow, rerunFailedJobs, cancelRun } = require('./github');
+const { parseGitHubUrl, parsePRUrl, fetchRunStatus, fetchPRRuns, fetchFailedTests, rerunWorkflow, rerunFailedJobs, cancelRun } = require('./github');
 const db = require('./db');
 const poller = require('./poller');
 
@@ -218,6 +218,17 @@ ipcMain.handle('auth-logout', async () => {
     return { ok: true };
 });
 
+ipcMain.handle('fetch-pr-runs', async (event, url) => {
+    const parsed = parsePRUrl(url);
+    if (!parsed) return { error: 'Invalid GitHub PR URL.' };
+    try {
+        const runs = await fetchPRRuns(parsed.owner, parsed.repo, parsed.prNumber, getActiveToken());
+        return { runs };
+    } catch (err) {
+        return { error: err.message };
+    }
+});
+
 ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
     const parsed = parseGitHubUrl(url);
     if (!parsed) {
@@ -239,11 +250,26 @@ ipcMain.handle('start-watching', async (event, { url, repeatTotal = 1 }) => {
         const initial = await fetchRunStatus(owner, repo, runId, getActiveToken());
 
         if (initial.status === 'completed' && repeat === 1) {
+            const name = initial.display_title || initial.name;
+            if (db.getRun(runId)) {
+                return { error: 'This run is already in the list.' };
+            }
+            const failedTests = initial.conclusion !== 'success'
+                ? await fetchFailedTests(owner, repo, runId, getActiveToken()).catch(() => [])
+                : [];
+            db.addRun({ id: runId, currentRunId: runId, owner, repo, workflowId: initial.workflow_id, name, url: initial.html_url, repeatTotal: 1, runNumber: 1 });
+            db.addRunResult({ runId, number: 1, conclusion: initial.conclusion, url: initial.html_url, startedAt: initial.run_started_at, completedAt: initial.updated_at, failedTests });
+            db.updateRun(runId, { status: 'completed' });
             return {
-                alreadyDone: true,
-                name: initial.display_title || initial.name,
+                started: true,
+                runId,
+                name,
+                status: 'completed',
                 conclusion: initial.conclusion,
                 url: initial.html_url,
+                repeatTotal: 1,
+                failed: initial.conclusion !== 'success' ? 1 : 0,
+                failedTests,
             };
         }
 

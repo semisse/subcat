@@ -73,48 +73,128 @@ addBtn.addEventListener('click', () => {
     urlInput.focus();
 });
 
-cancelBtn.addEventListener('click', () => {
+cancelBtn.addEventListener('click', () => resetForm());
+
+const prPicker = document.getElementById('prPicker');
+let selectedRunUrl = null;
+
+function resetForm() {
+    urlInput.value = '';
+    repeatInput.value = '1';
+    repeatInput.disabled = false;
     urlForm.style.display = 'none';
     addBtn.style.display = 'block';
-    urlInput.value = '';
+    prPicker.innerHTML = '';
+    prPicker.style.display = 'none';
+    selectedRunUrl = null;
+    watchBtn.textContent = 'Watch';
+    watchBtn.disabled = false;
     errorContainer.innerHTML = '';
-});
+}
+
+function isPRUrl(url) {
+    return /github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(url);
+}
 
 watchBtn.addEventListener('click', async () => {
     const url = urlInput.value.trim();
     if (!url) return;
 
     errorContainer.innerHTML = '';
+
+    if (isPRUrl(url) && !selectedRunUrl) {
+        watchBtn.disabled = true;
+        watchBtn.textContent = 'Loading…';
+        prPicker.innerHTML = '';
+        prPicker.style.display = 'none';
+
+        const result = await window.api.fetchPRRuns(url);
+
+        watchBtn.disabled = false;
+        watchBtn.textContent = 'Watch';
+
+        if (result.error) {
+            errorContainer.innerHTML = `<div class="error-msg">${escapeHtml(result.error)}</div>`;
+            return;
+        }
+
+        if (!result.runs.length) {
+            errorContainer.innerHTML = `<div class="error-msg">No workflow runs found for this PR.</div>`;
+            return;
+        }
+
+        prPicker.style.display = 'block';
+        const label = document.createElement('div');
+        label.className = 'pr-picker-label';
+        label.textContent = 'Pick a workflow to watch:';
+        prPicker.appendChild(label);
+        for (const run of result.runs) {
+            const item = document.createElement('div');
+            item.className = 'pr-picker-item';
+            item.dataset.url = run.url;
+            const dotClass = run.status === 'completed' ? run.conclusion : run.status;
+            item.innerHTML = `
+                <span class="status-dot ${escapeHtml(dotClass ?? '')}"></span>
+                <span class="pr-picker-name">${escapeHtml(run.name)}</span>
+                <span class="pr-picker-status">${escapeHtml(run.status === 'completed' ? (run.conclusion ?? '') : run.status)}</span>
+            `;
+            item.addEventListener('click', () => {
+                prPicker.querySelectorAll('.pr-picker-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+                selectedRunUrl = run.url;
+                watchBtn.disabled = false;
+                watchBtn.textContent = 'Watch Selected';
+                // completed runs can only be added as-is (no repeat)
+                repeatInput.disabled = run.status === 'completed';
+                if (run.status === 'completed') repeatInput.value = '1';
+            });
+            prPicker.appendChild(item);
+        }
+
+        watchBtn.disabled = true;
+        watchBtn.textContent = 'Watch Selected';
+        return;
+    }
+
+    const runUrl = selectedRunUrl || url;
     watchBtn.disabled = true;
-    watchBtn.textContent = 'Connecting...';
+    watchBtn.textContent = 'Connecting…';
 
     const repeatTotal = parseInt(repeatInput.value, 10) || 1;
-    const result = await window.api.startWatching({ url, repeatTotal });
+    const result = await window.api.startWatching({ url: runUrl, repeatTotal });
 
     watchBtn.disabled = false;
-    watchBtn.textContent = 'Watch Run';
+    watchBtn.textContent = selectedRunUrl ? 'Watch Selected' : 'Watch';
 
     if (result.error) {
         errorContainer.innerHTML = `<div class="error-msg">${escapeHtml(result.error)}</div>`;
         return;
     }
 
-    if (result.alreadyDone) {
-        errorContainer.innerHTML = `<div class="error-msg">That run already finished (${result.conclusion}).</div>`;
-        return;
-    }
-
     if (result.started) {
-        addRunCard(result.runId, result.name, result.status, null, result.url, result.repeatTotal);
-        urlInput.value = '';
-        repeatInput.value = '1';
-        urlForm.style.display = 'none';
-        addBtn.style.display = 'block';
+        if (result.status === 'completed') {
+            addRunCard(result.runId, result.name, 'completed', result.conclusion, result.url, 1, 1, [result.conclusion]);
+            applyCompletedState(result.runId, { repeatTotal: 1, failed: result.failed, failedTests: result.failedTests });
+        } else {
+            addRunCard(result.runId, result.name, result.status, null, result.url, result.repeatTotal);
+        }
+        resetForm();
     }
 });
 
 urlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') watchBtn.click();
+});
+
+urlInput.addEventListener('input', () => {
+    if (selectedRunUrl) {
+        selectedRunUrl = null;
+        prPicker.innerHTML = '';
+        prPicker.style.display = 'none';
+        watchBtn.textContent = 'Watch';
+        watchBtn.disabled = false;
+        repeatInput.disabled = false;
+    }
 });
 
 function escapeHtml(str) {
@@ -140,7 +220,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
             <div class="run-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
             <div class="run-actions">
                 <button class="open-btn">Open</button>
-                <button class="cancel-run-btn">Stop</button>
+                ${status !== 'completed' ? '<button class="cancel-run-btn">Stop</button>' : ''}
                 <button class="remove-btn" title="Remove">×</button>
             </div>
         </div>
@@ -152,7 +232,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
     `;
 
     card.querySelector('.open-btn').addEventListener('click', () => window.api.openExternal(url));
-    card.querySelector('.cancel-run-btn').addEventListener('click', async (e) => {
+    card.querySelector('.cancel-run-btn')?.addEventListener('click', async (e) => {
         const btn = e.currentTarget;
         btn.disabled = true;
         btn.textContent = 'Stopping…';
@@ -269,42 +349,77 @@ window.api.onRunRestored((data) => {
     }
 });
 
-window.api.onRunReportReady((data) => {
-    const card = document.getElementById(`run-${data.runId}`);
+function applyCompletedState(runId, { failed, failedTests }) {
+    const card = document.getElementById(`run-${runId}`);
     if (!card) return;
     const actions = card.querySelector('.run-actions');
+    const openBtn = actions.querySelector('.open-btn');
 
-    if (data.repeatTotal > 1) {
-        const reportBtn = document.createElement('button');
-        reportBtn.className = 'report-btn';
-        reportBtn.textContent = 'Report';
-        reportBtn.addEventListener('click', () => window.api.saveReport(data.runId));
-        actions.prepend(reportBtn);
+    // 3. Report — insert before Open
+    const reportBtn = document.createElement('button');
+    reportBtn.className = 'report-btn';
+    reportBtn.textContent = 'Report';
+    reportBtn.addEventListener('click', () => window.api.saveReport(runId));
+    actions.insertBefore(reportBtn, openBtn);
+
+    // 2. Rerun All — insert before Report (add only if not already there from updateRunCard)
+    if (!actions.querySelector('.rerun-btn')) {
+        const rerunBtn = document.createElement('button');
+        rerunBtn.className = 'rerun-btn';
+        rerunBtn.textContent = '↩ Rerun';
+        rerunBtn.addEventListener('click', async () => {
+            rerunBtn.disabled = true;
+            rerunBtn.textContent = 'Starting…';
+            const result = await window.api.rerunRun(runId);
+            if (result.error) {
+                rerunBtn.disabled = false;
+                rerunBtn.textContent = '↩ Rerun';
+            } else {
+                rerunBtn.remove();
+                card.dataset.active = 'true';
+            }
+        });
+        actions.insertBefore(rerunBtn, reportBtn);
+    } else {
+        // rerun-btn exists from updateRunCard — move it before report
+        actions.insertBefore(actions.querySelector('.rerun-btn'), reportBtn);
     }
 
-    if (data.failed > 0) {
+    // 1. Rerun Failed — insert before Rerun All
+    if (failed > 0) {
+        const rerunBtn = actions.querySelector('.rerun-btn');
         const rerunFailedBtn = document.createElement('button');
         rerunFailedBtn.className = 'rerun-failed-btn';
         rerunFailedBtn.textContent = '↩ Rerun Failed';
         rerunFailedBtn.addEventListener('click', async () => {
             rerunFailedBtn.disabled = true;
             rerunFailedBtn.textContent = 'Starting…';
-            const result = await window.api.rerunFailedRun(data.runId);
+
+            // optimistic UI update
+            card.className = 'run-card in-progress';
+            card.querySelector('.status-dot').className = 'status-dot queued';
+            card.querySelector('.status-text').textContent = 'queued';
+            card.querySelector('.failed-tests')?.remove();
+            card.dataset.active = 'true';
+
+            const result = await window.api.rerunFailedRun(runId);
             if (result.error) {
+                card.className = 'run-card completed-failure';
+                card.querySelector('.status-dot').className = 'status-dot failure';
+                card.querySelector('.status-text').textContent = 'failure';
+                card.dataset.active = 'false';
                 rerunFailedBtn.disabled = false;
                 rerunFailedBtn.textContent = '↩ Rerun Failed';
             } else {
-                card.querySelector('.failed-tests')?.remove();
                 rerunFailedBtn.remove();
-                card.dataset.active = 'true';
             }
         });
-        actions.prepend(rerunFailedBtn);
+        actions.insertBefore(rerunFailedBtn, rerunBtn);
 
-        if (data.failedTests?.length > 0) {
+        if (failedTests?.length > 0) {
             const list = document.createElement('ul');
             list.className = 'failed-tests';
-            for (const t of data.failedTests) {
+            for (const t of failedTests) {
                 const li = document.createElement('li');
                 li.textContent = t;
                 list.appendChild(li);
@@ -312,4 +427,8 @@ window.api.onRunReportReady((data) => {
             card.appendChild(list);
         }
     }
+}
+
+window.api.onRunReportReady((data) => {
+    applyCompletedState(data.runId, data);
 });
