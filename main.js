@@ -331,6 +331,7 @@ ipcMain.handle('rerun-run', async (event, runId) => {
     if (!run) return { error: 'Run not found.' };
     try {
         await rerunWorkflow(run.owner, run.repo, run.current_run_id, getActiveToken());
+        db.clearRunResults(runId);
         db.updateRun(runId, { status: 'watching', runNumber: 1 });
         poller.start({
             runId,
@@ -353,6 +354,7 @@ ipcMain.handle('rerun-failed-run', async (event, runId) => {
     if (!run) return { error: 'Run not found.' };
     try {
         await rerunFailedJobs(run.owner, run.repo, run.current_run_id, getActiveToken());
+        db.clearRunResults(runId);
         db.updateRun(runId, { status: 'watching', runNumber: 1 });
         poller.start({
             runId,

@@ -34,11 +34,13 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         showAboutPanel: jest.fn(),
     };
 
+    const ipcHandlers = {};
+
     jest.doMock('electron-updater', () => ({ autoUpdater }));
     jest.doMock('electron', () => ({
         app,
         BrowserWindow,
-        ipcMain: { handle: jest.fn() },
+        ipcMain: { handle: jest.fn((ch, fn) => { ipcHandlers[ch] = fn; }) },
         Notification: jest.fn(() => ({ on: jest.fn(), show: jest.fn() })),
         nativeImage: { createFromPath: jest.fn(() => ({})) },
         shell: { openExternal: jest.fn() },
@@ -64,16 +66,18 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         rerunFailedJobs: jest.fn(),
         cancelRun: jest.fn(),
     }));
-    jest.doMock('../db', () => ({
+    const db = {
         getAllRuns: jest.fn(() => []),
         getRun: jest.fn(),
         addRun: jest.fn(),
         updateRun: jest.fn(),
         addRunResult: jest.fn(),
         removeRun: jest.fn(),
+        clearRunResults: jest.fn(),
         getReport: jest.fn(),
         getRunResults: jest.fn(() => []),
-    }));
+    };
+    jest.doMock('../db', () => db);
     jest.doMock('../poller', () => ({
         on: jest.fn(),
         start: jest.fn(),
@@ -82,7 +86,7 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         isActive: jest.fn(() => false),
     }));
 
-    return { autoUpdater, dialog, BrowserWindow, app };
+    return { autoUpdater, dialog, BrowserWindow, app, db, ipcHandlers };
 }
 
 // ─── autoUpdater: update-downloaded ──────────────────────────────────────────
@@ -172,6 +176,89 @@ describe('autoUpdater update-downloaded', () => {
             buttons: ['Restart', 'Later'],
             defaultId: 0,
             cancelId: 1,
+        });
+    });
+});
+
+// ─── rerun handlers: clearRunResults ─────────────────────────────────────────
+
+describe('rerun handlers clear previous results', () => {
+    const RUN = {
+        id: '42', current_run_id: '42',
+        owner: 'owner', repo: 'repo',
+        name: 'My Workflow', url: 'https://github.com/owner/repo/actions/runs/42',
+        repeat_total: 3,
+    };
+
+    let db, ipcHandlers, github;
+
+    beforeEach(() => {
+        jest.resetModules();
+        ({ db, ipcHandlers } = buildMocks());
+        require('../main');
+
+        github = require('../github');
+        github.rerunWorkflow.mockResolvedValue(undefined);
+        github.rerunFailedJobs.mockResolvedValue(undefined);
+    });
+
+    describe('rerun-run', () => {
+        test('clears previous run_results before restarting', async () => {
+            db.getRun.mockReturnValue(RUN);
+
+            await ipcHandlers['rerun-run'](null, '42');
+
+            expect(db.clearRunResults).toHaveBeenCalledWith('42');
+        });
+
+        test('clears results before updating run status', async () => {
+            db.getRun.mockReturnValue(RUN);
+            const order = [];
+            db.clearRunResults.mockImplementation(() => order.push('clear'));
+            db.updateRun.mockImplementation(() => order.push('update'));
+
+            await ipcHandlers['rerun-run'](null, '42');
+
+            expect(order).toEqual(['clear', 'update']);
+        });
+
+        test('returns error without clearing if run not found', async () => {
+            db.getRun.mockReturnValue(null);
+
+            const result = await ipcHandlers['rerun-run'](null, '42');
+
+            expect(result).toEqual({ error: 'Run not found.' });
+            expect(db.clearRunResults).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('rerun-failed-run', () => {
+        test('clears previous run_results before restarting', async () => {
+            db.getRun.mockReturnValue(RUN);
+
+            await ipcHandlers['rerun-failed-run'](null, '42');
+
+            expect(db.clearRunResults).toHaveBeenCalledWith('42');
+        });
+
+        test('clears results before updating run status', async () => {
+            db.getRun.mockReturnValue(RUN);
+            const order = [];
+            db.clearRunResults.mockImplementation(() => order.push('clear'));
+            db.updateRun.mockImplementation(() => order.push('update'));
+
+            await ipcHandlers['rerun-failed-run'](null, '42');
+
+            expect(order).toEqual(['clear', 'update']);
+        });
+
+        test('returns error without clearing if run not found', async () => {
+            db.getRun.mockReturnValue(null);
+
+            const result = await ipcHandlers['rerun-failed-run'](null, '42');
+
+            expect(result).toEqual({ error: 'Run not found.' });
+            expect(db.clearRunResults).not.toHaveBeenCalled();
         });
     });
 });

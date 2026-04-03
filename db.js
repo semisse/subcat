@@ -92,6 +92,10 @@ function removeRun(id) {
     getDb().prepare(`DELETE FROM runs WHERE id = ?`).run(id);
 }
 
+function clearRunResults(runId) {
+    getDb().prepare(`DELETE FROM run_results WHERE run_id = ?`).run(runId);
+}
+
 function getReport(runId) {
     const run = getDb().prepare(`SELECT * FROM runs WHERE id = ?`).get(runId);
     if (!run) return null;
@@ -99,4 +103,4 @@ function getReport(runId) {
     return { name: run.name, rows };
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, getReport };
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport };

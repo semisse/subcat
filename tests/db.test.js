@@ -163,6 +163,30 @@ describe('removeRun', () => {
     });
 });
 
+// ─── clearRunResults ──────────────────────────────────────────────────────────
+
+describe('clearRunResults', () => {
+    beforeEach(() => db.addRun(RUN));
+
+    test('removes all results for a run', () => {
+        db.addRunResult({ runId: '1', number: 1, conclusion: 'success', url: null, startedAt: null, completedAt: null, failedTests: [] });
+        db.addRunResult({ runId: '1', number: 2, conclusion: 'failure', url: null, startedAt: null, completedAt: null, failedTests: [] });
+        db.clearRunResults('1');
+        expect(db.getRunResults('1')).toHaveLength(0);
+    });
+
+    test('does not remove the run itself', () => {
+        db.addRunResult({ runId: '1', number: 1, conclusion: 'success', url: null, startedAt: null, completedAt: null, failedTests: [] });
+        db.clearRunResults('1');
+        expect(db.getRun('1')).not.toBeNull();
+    });
+
+    test('is a no-op when there are no results', () => {
+        expect(() => db.clearRunResults('1')).not.toThrow();
+        expect(db.getRunResults('1')).toHaveLength(0);
+    });
+});
+
 // ─── getReport ────────────────────────────────────────────────────────────────
 
 describe('getReport', () => {
