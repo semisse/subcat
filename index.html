@@ -472,6 +472,41 @@
             color: #c4b5fd;
         }
 
+        .run-actions .rerun-failed-btn {
+            border-color: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .run-actions .rerun-failed-btn:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #fca5a5;
+            color: #fecaca;
+        }
+
+        .run-actions .rerun-failed-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .failed-tests {
+            list-style: none;
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: rgba(231, 76, 60, 0.07);
+            border-left: 2px solid #e74c3c;
+            border-radius: 4px;
+        }
+
+        .failed-tests li {
+            font-size: 11px;
+            color: #f87171;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            padding: 2px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         .empty-state {
             display: flex;
             flex-direction: column;

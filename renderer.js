@@ -273,9 +273,43 @@ window.api.onRunReportReady((data) => {
     const card = document.getElementById(`run-${data.runId}`);
     if (!card) return;
     const actions = card.querySelector('.run-actions');
-    const reportBtn = document.createElement('button');
-    reportBtn.className = 'report-btn';
-    reportBtn.textContent = 'Report';
-    reportBtn.addEventListener('click', () => window.api.saveReport(data.runId));
-    actions.prepend(reportBtn);
+
+    if (data.repeatTotal > 1) {
+        const reportBtn = document.createElement('button');
+        reportBtn.className = 'report-btn';
+        reportBtn.textContent = 'Report';
+        reportBtn.addEventListener('click', () => window.api.saveReport(data.runId));
+        actions.prepend(reportBtn);
+    }
+
+    if (data.failed > 0) {
+        const rerunFailedBtn = document.createElement('button');
+        rerunFailedBtn.className = 'rerun-failed-btn';
+        rerunFailedBtn.textContent = '↩ Rerun Failed';
+        rerunFailedBtn.addEventListener('click', async () => {
+            rerunFailedBtn.disabled = true;
+            rerunFailedBtn.textContent = 'Starting…';
+            const result = await window.api.rerunFailedRun(data.runId);
+            if (result.error) {
+                rerunFailedBtn.disabled = false;
+                rerunFailedBtn.textContent = '↩ Rerun Failed';
+            } else {
+                card.querySelector('.failed-tests')?.remove();
+                rerunFailedBtn.remove();
+                card.dataset.active = 'true';
+            }
+        });
+        actions.prepend(rerunFailedBtn);
+
+        if (data.failedTests?.length > 0) {
+            const list = document.createElement('ul');
+            list.className = 'failed-tests';
+            for (const t of data.failedTests) {
+                const li = document.createElement('li');
+                li.textContent = t;
+                list.appendChild(li);
+            }
+            card.appendChild(list);
+        }
+    }
 });

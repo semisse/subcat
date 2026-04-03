@@ -108,4 +108,28 @@ async function rerunWorkflow(owner, repo, runId, token) {
     return runId;
 }
 
-module.exports = { delay, parseGitHubUrl, githubGet, fetchRunStatus, fetchFailedTests, triggerRerun, rerunWorkflow, cancelRun };
+function rerunFailedJobs(owner, repo, runId, token) {
+    return new Promise((resolve, reject) => {
+        const req = https.request({
+            hostname: 'api.github.com',
+            path: `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+            method: 'POST',
+            headers: {
+                'User-Agent': 'SubCat-Electron',
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${token}`,
+                'Content-Length': 0
+            }
+        }, (res) => {
+            res.on('data', () => {});
+            res.on('end', () => {
+                if (res.statusCode === 201) resolve();
+                else reject(new Error(`Rerun failed jobs: ${res.statusCode}`));
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
+module.exports = { delay, parseGitHubUrl, githubGet, fetchRunStatus, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

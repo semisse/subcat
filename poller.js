@@ -106,11 +106,13 @@ class PollManager extends EventEmitter {
                     db.updateRun(runId, { status: 'completed' });
 
                     const passed = results.filter(r => r === 'success').length;
+                    const lastRow = reportRows[reportRows.length - 1];
                     this.emit('run:all-done', {
                         runId, name,
                         repeatTotal,
                         passed,
                         failed: repeatTotal - passed,
+                        failedTests: lastRow?.conclusion !== 'success' ? (lastRow?.failedTests ?? []) : [],
                     });
                 }
             } catch (err) {

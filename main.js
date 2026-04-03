@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, Notification, nativeImage, shell, dialog } 
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const auth = require('./auth');
-const { parseGitHubUrl, fetchRunStatus, rerunWorkflow, cancelRun } = require('./github');
+const { parseGitHubUrl, fetchRunStatus, rerunWorkflow, rerunFailedJobs, cancelRun } = require('./github');
 const db = require('./db');
 const poller = require('./poller');
 
@@ -73,8 +73,8 @@ poller.on('run:repeat-done', ({ runId, runNumber, conclusion, name, url, repeatT
     notification.show();
 });
 
-poller.on('run:all-done', ({ runId, repeatTotal, passed, failed }) => {
-    mainWindow?.webContents.send('run-report-ready', { runId, repeatTotal, passed, failed });
+poller.on('run:all-done', ({ runId, repeatTotal, passed, failed, failedTests }) => {
+    mainWindow?.webContents.send('run-report-ready', { runId, repeatTotal, passed, failed, failedTests });
 });
 
 poller.on('run:error', (data) => {
@@ -304,6 +304,28 @@ ipcMain.handle('rerun-run', async (event, runId) => {
     if (!run) return { error: 'Run not found.' };
     try {
         await rerunWorkflow(run.owner, run.repo, run.current_run_id, getActiveToken());
+        db.updateRun(runId, { status: 'watching', runNumber: 1 });
+        poller.start({
+            runId,
+            currentRunId: run.current_run_id,
+            owner: run.owner,
+            repo: run.repo,
+            runNumber: 1,
+            repeatTotal: run.repeat_total,
+            name: run.name,
+            url: run.url,
+        }, getActiveToken);
+        return { started: true, status: 'queued' };
+    } catch (err) {
+        return { error: err.message };
+    }
+});
+
+ipcMain.handle('rerun-failed-run', async (event, runId) => {
+    const run = db.getRun(runId);
+    if (!run) return { error: 'Run not found.' };
+    try {
+        await rerunFailedJobs(run.owner, run.repo, run.current_run_id, getActiveToken());
         db.updateRun(runId, { status: 'watching', runNumber: 1 });
         poller.start({
             runId,
