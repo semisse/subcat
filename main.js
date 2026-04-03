@@ -160,7 +160,8 @@ if (process.env.NODE_ENV !== 'development') {
     autoUpdater.checkForUpdates();
 
     autoUpdater.on('update-downloaded', () => {
-        dialog.showMessageBox(mainWindow, {
+        const dialogParent = mainWindow ?? undefined;
+        dialog.showMessageBox(dialogParent, {
             type: 'info',
             buttons: ['Restart', 'Later'],
             defaultId: 0,
