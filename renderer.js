@@ -202,6 +202,24 @@ function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTot
     if (status === 'completed') {
         card.dataset.active = 'false';
         card.querySelector('.cancel-run-btn')?.remove();
+        if (!card.querySelector('.rerun-btn')) {
+            const rerunBtn = document.createElement('button');
+            rerunBtn.className = 'rerun-btn';
+            rerunBtn.textContent = '↩ Rerun';
+            rerunBtn.addEventListener('click', async () => {
+                rerunBtn.disabled = true;
+                rerunBtn.textContent = 'Starting…';
+                const result = await window.api.rerunRun(runId);
+                if (result.error) {
+                    rerunBtn.disabled = false;
+                    rerunBtn.textContent = '↩ Rerun';
+                } else {
+                    rerunBtn.remove();
+                    card.dataset.active = 'true';
+                }
+            });
+            card.querySelector('.run-actions').prepend(rerunBtn);
+        }
     }
 
     if (name) card.querySelector('.run-name').textContent = name;

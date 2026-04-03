@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('api', {
     stopWatching: (runId) => ipcRenderer.invoke('stop-watching', runId),
     confirm: (title, message) => ipcRenderer.invoke('confirm-dialog', { title, message }),
     cancelRun: (runId) => ipcRenderer.invoke('cancel-run', runId),
+    rerunRun: (runId) => ipcRenderer.invoke('rerun-run', runId),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
     onRunUpdate: (callback) => ipcRenderer.on('run-update', (_, data) => callback(data)),
     onRunError: (callback) => ipcRenderer.on('run-error', (_, data) => callback(data)),

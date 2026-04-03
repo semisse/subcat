@@ -59,6 +59,18 @@ describe('start / stop', () => {
         expect(github.fetchRunStatus).toHaveBeenCalledTimes(1);
     });
 
+    test('deactivate removes run from active without calling db.removeRun', async () => {
+        github.fetchRunStatus.mockResolvedValue(makeRun());
+        github.fetchFailedTests.mockResolvedValue([]);
+
+        poller.start(makeConfig(), () => 'token');
+        expect(poller.isActive('1')).toBe(true);
+        poller.deactivate('1');
+        expect(poller.isActive('1')).toBe(false);
+        expect(db.removeRun).not.toHaveBeenCalled();
+        await tick();
+    });
+
     test('stop removes run from active and calls db.removeRun', async () => {
         github.fetchRunStatus.mockResolvedValue(makeRun());
         github.fetchFailedTests.mockResolvedValue([]);

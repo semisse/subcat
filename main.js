@@ -299,6 +299,28 @@ ipcMain.handle('stop-watching', async (event, runId) => {
     return { stopped: true };
 });
 
+ipcMain.handle('rerun-run', async (event, runId) => {
+    const run = db.getRun(runId);
+    if (!run) return { error: 'Run not found.' };
+    try {
+        await rerunWorkflow(run.owner, run.repo, run.current_run_id, getActiveToken());
+        db.updateRun(runId, { status: 'watching', runNumber: 1 });
+        poller.start({
+            runId,
+            currentRunId: run.current_run_id,
+            owner: run.owner,
+            repo: run.repo,
+            runNumber: 1,
+            repeatTotal: run.repeat_total,
+            name: run.name,
+            url: run.url,
+        }, getActiveToken);
+        return { started: true, status: 'queued' };
+    } catch (err) {
+        return { error: err.message };
+    }
+});
+
 ipcMain.handle('cancel-run', async (event, runId) => {
     const run = db.getRun(runId);
     if (!run) return { error: 'Run not found.' };
@@ -328,27 +350,28 @@ ipcMain.handle('save-report', async (event, runId) => {
 
     const { filePath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Save Run Report',
-        defaultPath: `subcat-report-${runId}.csv`,
-        filters: [{ name: 'CSV', extensions: ['csv'] }],
+        defaultPath: `subcat-report-${runId}.md`,
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
     });
 
     if (!filePath) return { cancelled: true };
 
-    const csv = v => {
-        const str = String(v ?? '').replace(/"/g, '""');
-        // Prefix with tab to neutralise CSV injection (=, +, -, @, tab, CR)
-        return /^[=+\-@\t\r]/.test(str) ? `"\t${str}"` : `"${str}"`;
-    };
-    const header = 'Run #,Result,Failed Tests,Started At,Completed At,URL';
-    const rows = report.rows.map(r => [
-        r.number,
-        r.conclusion,
-        r.failedTests?.length ? csv(r.failedTests.join(' | ')) : '-',
-        csv(r.started_at ?? ''),
-        csv(r.completed_at ?? ''),
-        csv(r.url),
-    ].join(','));
-    require('fs').writeFileSync(filePath, [header, ...rows].join('\n'), 'utf8');
+    const passed = report.rows.filter(r => r.conclusion === 'success').length;
+    const failed = report.rows.length - passed;
+    const lines = [
+        `# ${report.name}`,
+        '',
+        `**Runs:** ${report.rows.length} · **Passed:** ${passed} · **Failed:** ${failed}`,
+        '',
+        '| Run # | Result | Started At | Completed At | Failed Tests |',
+        '|-------|--------|------------|--------------|--------------|',
+        ...report.rows.map(r => {
+            const emoji = r.conclusion === 'success' ? '✅' : '❌';
+            const tests = r.failedTests?.length ? r.failedTests.join(', ') : '—';
+            return `| [${r.number}](${r.url}) | ${emoji} ${r.conclusion} | ${r.started_at ?? '—'} | ${r.completed_at ?? '—'} | ${tests} |`;
+        }),
+    ];
+    require('fs').writeFileSync(filePath, lines.join('\n'), 'utf8');
 
     return { saved: true };
 });

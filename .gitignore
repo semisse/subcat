@@ -4,3 +4,5 @@ coverage/
 .DS_Store
 *.db
 CLAUDE.md
+*.p12
+*.cer
