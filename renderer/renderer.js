@@ -13,12 +13,12 @@ const repeatInput = document.getElementById('repeatInput');
 const watchBtn = document.getElementById('watchBtn');
 const cancelBtn = document.getElementById('cancelBtn');
 const runsList = document.getElementById('runsList');
-const sectionPinned = document.getElementById('sectionPinned');
 const sectionMyPrs = document.getElementById('sectionMyPrs');
-const sectionWatching = document.getElementById('sectionWatching');
-const sectionPinnedItems = document.getElementById('sectionPinnedItems');
+const sectionRuns = document.getElementById('sectionRuns');
+const sectionWorkflows = document.getElementById('sectionWorkflows');
 const sectionMyPrsItems = document.getElementById('sectionMyPrsItems');
-const sectionWatchingItems = document.getElementById('sectionWatchingItems');
+const sectionRunsItems = document.getElementById('sectionRunsItems');
+const sectionWorkflowsItems = document.getElementById('sectionWorkflowsItems');
 const emptyState = document.getElementById('emptyState');
 const loadingState = document.getElementById('loadingState');
 const errorContainer = document.getElementById('errorContainer');
@@ -58,9 +58,9 @@ refreshBtn.addEventListener('click', async () => {
     runsList.style.display = 'none';
     emptyState.style.display = 'none';
     loadingState.classList.add('visible');
-    sectionPinnedItems.innerHTML = '';
     sectionMyPrsItems.innerHTML = '';
-    sectionWatchingItems.innerHTML = '';
+    sectionRunsItems.innerHTML = '';
+    sectionWorkflowsItems.innerHTML = '';
     updateSectionVisibility();
 
     await Promise.all([
@@ -109,15 +109,15 @@ async function loadUserPRs() {
 }
 
 function updateSectionVisibility() {
-    sectionPinned.style.display = sectionPinnedItems.children.length > 0 ? '' : 'none';
     sectionMyPrs.style.display = sectionMyPrsItems.children.length > 0 ? '' : 'none';
-    sectionWatching.style.display = sectionWatchingItems.children.length > 0 ? '' : 'none';
+    sectionRuns.style.display = sectionRunsItems.children.length > 0 ? '' : 'none';
+    sectionWorkflows.style.display = sectionWorkflowsItems.children.length > 0 ? '' : 'none';
 }
 
 function getSectionItems(source) {
-    if (source === 'pinned') return sectionPinnedItems;
     if (source === 'pr') return sectionMyPrsItems;
-    return sectionWatchingItems;
+    if (source === 'workflow') return sectionWorkflowsItems;
+    return sectionRunsItems;
 }
 
 function showMainView() {
