@@ -207,16 +207,9 @@ async function openPRDetail(pr) {
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
             <span class="pr-detail-run-name">${escapeHtml(run.name)}</span>
             <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
-            <span class="pr-drill-chevron">›</span>
-            <div class="pr-detail-run-actions">
-                <button class="open-run-btn">↗</button>
-            </div>
+            <span class="pr-drill-chevron">↗</span>
         `;
-        item.addEventListener('click', (e) => {
-            if (e.target.closest('.open-run-btn')) return;
-            openWorkflowRuns(run, currentPRContext);
-        });
-        item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
+        item.addEventListener('click', () => window.api.openExternal(run.url));
         prDetailList.appendChild(item);
     }
 }
