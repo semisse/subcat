@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('api', {
     startWatching: (data) => ipcRenderer.invoke('start-watching', data),
     fetchUserPRs: () => ipcRenderer.invoke('fetch-user-prs'),
     fetchPRRuns: (url) => ipcRenderer.invoke('fetch-pr-runs', url),
+    fetchWorkflowPRRuns: (opts) => ipcRenderer.invoke('fetch-workflow-pr-runs', opts),
     stopWatching: (runId) => ipcRenderer.invoke('stop-watching', runId),
     confirm: (title, message) => ipcRenderer.invoke('confirm-dialog', { title, message }),
     cancelRun: (runId) => ipcRenderer.invoke('cancel-run', runId),

@@ -13,6 +13,10 @@ function register({ db, poller, storage, getWindow, getUser }) {
         return runs.fetchPRRunsHandler(url, { getToken });
     });
 
+    ipcMain.handle('fetch-workflow-pr-runs', async (event, opts) => {
+        return runs.fetchWorkflowPRRunsHandler(opts, { getToken });
+    });
+
     ipcMain.handle('start-watching', async (event, opts) => {
         return runs.startWatching(opts, { db, poller, getToken });
     });

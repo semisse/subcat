@@ -1,6 +1,6 @@
 const {
     parseGitHubUrl, parsePRUrl,
-    fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchFailedTests,
+    fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchWorkflowRunsForPR, fetchFailedTests,
     rerunWorkflow, rerunFailedJobs, cancelRun,
 } = require('./github');
 
@@ -163,7 +163,16 @@ async function fetchPRRunsHandler(url, { getToken }) {
     const parsed = parsePRUrl(url);
     if (!parsed) return { error: 'Invalid GitHub PR URL.' };
     try {
-        const runs = await fetchPRRuns(parsed.owner, parsed.repo, parsed.prNumber, getToken());
+        const result = await fetchPRRuns(parsed.owner, parsed.repo, parsed.prNumber, getToken());
+        return result;
+    } catch (err) {
+        return { error: err.message };
+    }
+}
+
+async function fetchWorkflowPRRunsHandler({ owner, repo, workflowId, headSha }, { getToken }) {
+    try {
+        const runs = await fetchWorkflowRunsForPR(owner, repo, workflowId, headSha, getToken());
         return { runs };
     } catch (err) {
         return { error: err.message };
@@ -232,5 +241,6 @@ module.exports = {
     cancelRunHandler,
     fetchUserPRsHandler,
     fetchPRRunsHandler,
+    fetchWorkflowPRRunsHandler,
     resumeRuns,
 };

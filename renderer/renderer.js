@@ -5,6 +5,10 @@ const prDetailNav = document.getElementById('prDetailNav');
 const prDetailBack = document.getElementById('prDetailBack');
 const prDetailTitle = document.getElementById('prDetailTitle');
 const prDetailList = document.getElementById('prDetailList');
+const workflowRunsNav = document.getElementById('workflowRunsNav');
+const workflowRunsBack = document.getElementById('workflowRunsBack');
+const workflowRunsTitle = document.getElementById('workflowRunsTitle');
+const workflowRunsList = document.getElementById('workflowRunsList');
 
 const addBtn = document.getElementById('addBtn');
 const urlForm = document.getElementById('urlForm');
@@ -157,12 +161,28 @@ function showMainView() {
 function showPRDetailView() {
     myPrsList.style.display = 'none';
     prDetailList.style.display = 'block';
+    workflowRunsList.style.display = 'none';
     myPrsNav.style.display = 'none';
     prDetailNav.style.display = 'flex';
+    workflowRunsNav.style.display = 'none';
     runsList.style.display = 'none';
     emptyState.style.display = 'none';
     document.querySelector('.input-section').style.display = 'none';
 }
+
+function showWorkflowRunsView() {
+    myPrsList.style.display = 'none';
+    prDetailList.style.display = 'none';
+    workflowRunsList.style.display = 'block';
+    myPrsNav.style.display = 'none';
+    prDetailNav.style.display = 'none';
+    workflowRunsNav.style.display = 'flex';
+    runsList.style.display = 'none';
+    emptyState.style.display = 'none';
+    document.querySelector('.input-section').style.display = 'none';
+}
+
+let currentPRContext = null;
 
 async function openPRDetail(pr) {
     showPRDetailView();
@@ -177,16 +197,53 @@ async function openPRDetail(pr) {
         return;
     }
 
+    currentPRContext = { owner: result.owner, repo: result.repo, headSha: result.headSha };
+
+    for (const run of result.runs) {
+        const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
+        const item = document.createElement('div');
+        item.className = 'pr-detail-run';
+        item.style.cursor = 'pointer';
+        item.innerHTML = `
+            <span class="status-dot ${escapeHtml(dotClass)}"></span>
+            <span class="pr-detail-run-name">${escapeHtml(run.name)}</span>
+            <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
+            <div class="pr-detail-run-actions">
+                <button class="open-run-btn">↗</button>
+            </div>
+        `;
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.open-run-btn')) return;
+            openWorkflowRuns(run, currentPRContext);
+        });
+        item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
+        prDetailList.appendChild(item);
+    }
+}
+
+async function openWorkflowRuns(workflow, { owner, repo, headSha }) {
+    showWorkflowRunsView();
+    workflowRunsTitle.textContent = workflow.name;
+    workflowRunsList.innerHTML = '<div class="pr-detail-loading">Loading runs…</div>';
+
+    const result = await window.api.fetchWorkflowPRRuns({ owner, repo, workflowId: workflow.workflowId, headSha });
+    workflowRunsList.innerHTML = '';
+
+    if (result.error || !result.runs?.length) {
+        workflowRunsList.innerHTML = '<div class="pr-detail-empty">No runs found.</div>';
+        return;
+    }
+
     for (const run of result.runs) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
         const item = document.createElement('div');
         item.className = 'pr-detail-run';
         item.innerHTML = `
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
-            <span class="pr-detail-run-name">${escapeHtml(run.name)}</span>
+            <span class="pr-detail-run-name">#${run.runNumber}</span>
             <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
             <div class="pr-detail-run-actions">
-                <button class="watch-run-btn">Add to Watching</button>
+                <button class="watch-run-btn">Watch</button>
                 <button class="open-run-btn">↗</button>
             </div>
         `;
@@ -194,31 +251,28 @@ async function openPRDetail(pr) {
         watchBtn.addEventListener('click', async () => {
             watchBtn.disabled = true;
             watchBtn.textContent = '…';
-            const r = await window.api.startWatching({ url: run.url, repeatTotal: 1, source: 'pr' });
-            console.log('[watch]', run.url, r);
+            const r = await window.api.startWatching({ url: run.url, repeatTotal: 1, source: 'manual' });
             if (r.error) {
                 watchBtn.textContent = r.error === 'This run is already in the list.' ? 'Already added' : 'Error';
-                setTimeout(() => {
-                    watchBtn.disabled = false;
-                    watchBtn.textContent = 'Watch';
-                }, 2000);
+                setTimeout(() => { watchBtn.disabled = false; watchBtn.textContent = 'Watch'; }, 2000);
             } else if (r.started) {
                 watchBtn.textContent = 'Added';
                 showMainView();
                 if (r.status === 'completed') {
-                    addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion], 'pr');
+                    addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion], 'manual');
                     applyCompletedState(r.runId, { repeatTotal: 1, failed: r.failed, failedTests: r.failedTests });
                 } else {
-                    addRunCard(r.runId, r.name, r.status, null, r.url, r.repeatTotal, 1, [], 'pr');
+                    addRunCard(r.runId, r.name, r.status, null, r.url, r.repeatTotal, 1, [], 'manual');
                 }
             }
         });
         item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
-        prDetailList.appendChild(item);
+        workflowRunsList.appendChild(item);
     }
 }
 
 prDetailBack.addEventListener('click', showMainView);
+workflowRunsBack.addEventListener('click', showPRDetailView);
 
 addBtn.addEventListener('click', () => {
     urlForm.style.display = 'block';
