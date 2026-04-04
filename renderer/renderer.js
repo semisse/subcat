@@ -295,6 +295,14 @@ urlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') watchBtn.click();
 });
 
+urlInput.addEventListener('paste', () => {
+    setTimeout(() => {
+        const val = urlInput.value.trim();
+        const isRunUrl = /github\.com\/[^/]+\/[^/]+\/actions\/runs\/\d+/.test(val);
+        if (isRunUrl || isPRUrl(val)) watchBtn.click();
+    }, 0);
+});
+
 urlInput.addEventListener('input', () => {
     if (selectedRunUrl) {
         selectedRunUrl = null;
