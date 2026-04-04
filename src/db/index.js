@@ -42,13 +42,17 @@ function migrate(db) {
             failed_tests TEXT
         );
     `);
+
+    try {
+        db.exec(`ALTER TABLE runs ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`);
+    } catch (_) { /* column already exists */ }
 }
 
-function addRun({ id, currentRunId, owner, repo, workflowId, name, url, repeatTotal, runNumber }) {
+function addRun({ id, currentRunId, owner, repo, workflowId, name, url, repeatTotal, runNumber, source = 'manual' }) {
     getDb().prepare(`
-        INSERT INTO runs (id, current_run_id, owner, repo, workflow_id, name, url, repeat_total, run_number, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'watching', ?)
-    `).run(id, currentRunId, owner, repo, workflowId ?? null, name, url, repeatTotal, runNumber, new Date().toISOString());
+        INSERT INTO runs (id, current_run_id, owner, repo, workflow_id, name, url, repeat_total, run_number, status, source, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'watching', ?, ?)
+    `).run(id, currentRunId, owner, repo, workflowId ?? null, name, url, repeatTotal, runNumber, source, new Date().toISOString());
 }
 
 function updateRun(id, { currentRunId, runNumber, status, name, url } = {}) {

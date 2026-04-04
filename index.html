@@ -335,6 +335,20 @@
             flex: 1;
         }
 
+        .runs-section {
+            margin-bottom: 6px;
+        }
+
+        .runs-section-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #444;
+            margin-bottom: 6px;
+            padding-left: 2px;
+        }
+
         .run-card {
             background: #16213e;
             border: 1px solid #333;
@@ -833,7 +847,20 @@
         <div class="section-divider"></div>
     </div>
 
-    <div class="runs-list" id="runsList"></div>
+    <div class="runs-list" id="runsList">
+        <div class="runs-section" id="sectionPinned" style="display:none;">
+            <div class="runs-section-label">Pinned</div>
+            <div id="sectionPinnedItems"></div>
+        </div>
+        <div class="runs-section" id="sectionMyPrs" style="display:none;">
+            <div class="runs-section-label">My PRs</div>
+            <div id="sectionMyPrsItems"></div>
+        </div>
+        <div class="runs-section" id="sectionWatching" style="display:none;">
+            <div class="runs-section-label">Watching</div>
+            <div id="sectionWatchingItems"></div>
+        </div>
+    </div>
     <div class="empty-state" id="emptyState">
         <img src="assets/noresults.png" alt="">
         <span>Paste a PR or workflow URL to stop babysitting your CI.</span>

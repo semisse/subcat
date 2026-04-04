@@ -13,6 +13,12 @@ const repeatInput = document.getElementById('repeatInput');
 const watchBtn = document.getElementById('watchBtn');
 const cancelBtn = document.getElementById('cancelBtn');
 const runsList = document.getElementById('runsList');
+const sectionPinned = document.getElementById('sectionPinned');
+const sectionMyPrs = document.getElementById('sectionMyPrs');
+const sectionWatching = document.getElementById('sectionWatching');
+const sectionPinnedItems = document.getElementById('sectionPinnedItems');
+const sectionMyPrsItems = document.getElementById('sectionMyPrsItems');
+const sectionWatchingItems = document.getElementById('sectionWatchingItems');
 const emptyState = document.getElementById('emptyState');
 const loadingState = document.getElementById('loadingState');
 const errorContainer = document.getElementById('errorContainer');
@@ -52,6 +58,10 @@ refreshBtn.addEventListener('click', async () => {
     runsList.style.display = 'none';
     emptyState.style.display = 'none';
     loadingState.classList.add('visible');
+    sectionPinnedItems.innerHTML = '';
+    sectionMyPrsItems.innerHTML = '';
+    sectionWatchingItems.innerHTML = '';
+    updateSectionVisibility();
 
     await Promise.all([
         window.api.refreshRuns(),
@@ -66,6 +76,7 @@ refreshBtn.addEventListener('click', async () => {
         loadingState.classList.remove('visible', 'hiding');
         runsList.style.display = '';
         if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+        updateSectionVisibility();
     }, { once: true });
 });
 
@@ -95,6 +106,18 @@ async function loadUserPRs() {
         item.addEventListener('click', () => openPRDetail(pr));
         myPrsList.appendChild(item);
     }
+}
+
+function updateSectionVisibility() {
+    sectionPinned.style.display = sectionPinnedItems.children.length > 0 ? '' : 'none';
+    sectionMyPrs.style.display = sectionMyPrsItems.children.length > 0 ? '' : 'none';
+    sectionWatching.style.display = sectionWatchingItems.children.length > 0 ? '' : 'none';
+}
+
+function getSectionItems(source) {
+    if (source === 'pinned') return sectionPinnedItems;
+    if (source === 'pr') return sectionMyPrsItems;
+    return sectionWatchingItems;
 }
 
 function showMainView() {
@@ -150,7 +173,7 @@ async function openPRDetail(pr) {
         watchBtn.addEventListener('click', async () => {
             watchBtn.disabled = true;
             watchBtn.textContent = '…';
-            const r = await window.api.startWatching({ url: run.url, repeatTotal: 1 });
+            const r = await window.api.startWatching({ url: run.url, repeatTotal: 1, source: 'pr' });
             console.log('[watch]', run.url, r);
             if (r.error) {
                 watchBtn.textContent = r.error === 'This run is already in the list.' ? 'Already added' : 'Error';
@@ -162,10 +185,10 @@ async function openPRDetail(pr) {
                 watchBtn.textContent = 'Added';
                 showMainView();
                 if (r.status === 'completed') {
-                    addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion]);
+                    addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion], 'pr');
                     applyCompletedState(r.runId, { repeatTotal: 1, failed: r.failed, failedTests: r.failedTests });
                 } else {
-                    addRunCard(r.runId, r.name, r.status, null, r.url, r.repeatTotal);
+                    addRunCard(r.runId, r.name, r.status, null, r.url, r.repeatTotal, 1, [], 'pr');
                 }
             }
         });
@@ -281,11 +304,12 @@ watchBtn.addEventListener('click', async () => {
     }
 
     if (result.started) {
+        const source = result.source ?? 'manual';
         if (result.status === 'completed') {
-            addRunCard(result.runId, result.name, 'completed', result.conclusion, result.url, 1, 1, [result.conclusion]);
+            addRunCard(result.runId, result.name, 'completed', result.conclusion, result.url, 1, 1, [result.conclusion], source);
             applyCompletedState(result.runId, { repeatTotal: 1, failed: result.failed, failedTests: result.failedTests });
         } else {
-            addRunCard(result.runId, result.name, result.status, null, result.url, result.repeatTotal);
+            addRunCard(result.runId, result.name, result.status, null, result.url, result.repeatTotal, 1, [], source);
         }
         resetForm();
     }
@@ -312,7 +336,7 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repeatCurrent = 1, results = []) {
+function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repeatCurrent = 1, results = [], source = 'manual') {
     emptyState.style.display = 'none';
 
     const passed = results.filter(r => r === 'success').length;
@@ -349,6 +373,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
         card.remove();
         watchedRuns.delete(runId);
         if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+        updateSectionVisibility();
     });
     card.querySelector('.remove-btn').addEventListener('click', async () => {
         if (card.dataset.active === 'true') {
@@ -362,10 +387,12 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
         card.remove();
         watchedRuns.delete(runId);
         if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+        updateSectionVisibility();
     });
 
-    runsList.prepend(card);
-    watchedRuns.set(runId, { name, status, conclusion, url, repeatTotal });
+    getSectionItems(source).prepend(card);
+    updateSectionVisibility();
+    watchedRuns.set(runId, { name, status, conclusion, url, repeatTotal, source });
 }
 
 function getCardClass(status, conclusion) {
@@ -458,9 +485,10 @@ window.api.onRunError((data) => {
 });
 
 window.api.onRunRestored((data) => {
+    const source = data.source ?? 'manual';
     if (data.status === 'completed') {
         const conclusion = data.failed === 0 ? 'success' : 'failure';
-        addRunCard(data.runId, data.name, 'completed', conclusion, data.url, data.repeatTotal, data.repeatCurrent, data.results);
+        addRunCard(data.runId, data.name, 'completed', conclusion, data.url, data.repeatTotal, data.repeatCurrent, data.results, source);
         const card = document.getElementById(`run-${data.runId}`);
         card?.querySelector('.cancel-run-btn')?.remove();
         if (card && data.repeatTotal > 1) {
@@ -471,7 +499,7 @@ window.api.onRunRestored((data) => {
             card.querySelector('.run-actions').prepend(reportBtn);
         }
     } else {
-        addRunCard(data.runId, data.name, 'in_progress', null, data.url, data.repeatTotal, data.repeatCurrent, data.results);
+        addRunCard(data.runId, data.name, 'in_progress', null, data.url, data.repeatTotal, data.repeatCurrent, data.results, source);
     }
 });
 
