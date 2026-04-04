@@ -19,8 +19,8 @@ app.setAboutPanelOptions({
     applicationName: 'SubCat',
     applicationVersion: app.getVersion(),
     copyright: '© Samuel Fialho',
-    tagline: 'Today we dream. Tomorrow we build.',
-    credits: 'Today we dream. Tomorrow we build.',
+    tagline: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
+    credits: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
     website: 'https://github.com/semisse/subcat',
     iconPath: path.join(__dirname, '../../assets', 'Icon-iOS-Default-1024x1024@1x.png'),
 });
