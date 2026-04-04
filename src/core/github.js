@@ -60,6 +60,7 @@ async function fetchWorkflowRunsForPR(owner, repo, workflowId, headRef, token) {
     return workflow_runs.map(r => ({
         runId: String(r.id),
         runNumber: r.run_number,
+        runAttempt: r.run_attempt,
         status: r.status,
         conclusion: r.conclusion,
         url: `https://github.com/${owner}/${repo}/actions/runs/${r.id}`,

@@ -33,6 +33,34 @@ function register({ db, getWindow }) {
 
         return { saved: true };
     });
+
+    ipcMain.handle('save-pr-workflow-report', async (event, { workflowName, runs }) => {
+        const { filePath } = await dialog.showSaveDialog(getWindow(), {
+            title: 'Save Workflow Report',
+            defaultPath: `subcat-report-${workflowName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.md`,
+            filters: [{ name: 'Markdown', extensions: ['md'] }],
+        });
+
+        if (!filePath) return { cancelled: true };
+
+        const passed = runs.filter(r => r.conclusion === 'success').length;
+        const failed = runs.filter(r => r.conclusion && r.conclusion !== 'success').length;
+        const lines = [
+            `# ${workflowName}`,
+            '',
+            `**Runs:** ${runs.length} · **Passed:** ${passed} · **Failed:** ${failed}`,
+            '',
+            '| Attempt | Result | Link |',
+            '|---------|--------|------|',
+            ...runs.map(r => {
+                const emoji = r.conclusion === 'success' ? '✅' : r.conclusion ? '❌' : '🔄';
+                const result = r.conclusion ?? r.status ?? '—';
+                return `| #${r.runAttempt ?? r.runNumber} | ${emoji} ${result} | [Open](${r.url}) |`;
+            }),
+        ];
+        fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+        return { saved: true };
+    });
 }
 
 module.exports = { register };

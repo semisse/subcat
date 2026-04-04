@@ -9,6 +9,7 @@ const workflowRunsNav = document.getElementById('workflowRunsNav');
 const workflowRunsBack = document.getElementById('workflowRunsBack');
 const workflowRunsTitle = document.getElementById('workflowRunsTitle');
 const workflowRunsList = document.getElementById('workflowRunsList');
+const workflowRunsReportBtn = document.getElementById('workflowRunsReportBtn');
 
 const addBtn = document.getElementById('addBtn');
 const urlForm = document.getElementById('urlForm');
@@ -183,6 +184,7 @@ function showWorkflowRunsView() {
 }
 
 let currentPRContext = null;
+let currentWorkflowRuns = null;
 
 async function openPRDetail(pr) {
     showPRDetailView();
@@ -234,11 +236,13 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
         return;
     }
 
+    currentWorkflowRuns = result.runs;
+
     for (const [i, run] of result.runs.entries()) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
         const item = document.createElement('div');
         item.className = 'pr-detail-run';
-        const label = run.runNumber ? `Run #${run.runNumber}` : `Run ${i + 1}`;
+        const label = `Attempt #${run.runAttempt ?? (result.runs.length - i)}`;
         item.innerHTML = `
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
             <span class="pr-detail-run-name">${escapeHtml(label)}</span>
@@ -274,6 +278,11 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
 
 prDetailBack.addEventListener('click', showMainView);
 workflowRunsBack.addEventListener('click', showPRDetailView);
+workflowRunsReportBtn.addEventListener('click', () => {
+    if (currentWorkflowRuns) {
+        window.api.savePRWorkflowReport({ workflowName: workflowRunsTitle.textContent, runs: currentWorkflowRuns });
+    }
+});
 
 addBtn.addEventListener('click', () => {
     urlForm.style.display = 'block';
