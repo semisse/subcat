@@ -341,7 +341,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
 
     const passed = results.filter(r => r === 'success').length;
     const failed = results.filter(r => r !== 'success').length;
-    const resultsStr = repeatTotal > 1 && results.length > 0 ? ` · ✅ ${passed} ❌ ${failed}` : '';
+    const resultsStr = repeatTotal > 1 && results.length > 0 ? ` · <span class="count-pass">${passed}</span> <span class="count-fail">${failed}</span>` : '';
     const repeatLabel = repeatTotal > 1 ? `Run ${repeatCurrent}/${repeatTotal}${resultsStr}` : '';
 
     const card = document.createElement('div');
@@ -360,7 +360,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
         <div class="run-status">
             <span class="status-dot ${status === 'completed' ? conclusion : status}"></span>
             <span class="status-text">${formatStatus(status, conclusion)}</span>
-            ${repeatTotal > 1 ? `<span class="run-repeat">${escapeHtml(repeatLabel)}</span>` : ''}
+            ${repeatTotal > 1 ? `<span class="run-repeat">${repeatLabel}</span>` : ''}
         </div>
     `;
 
@@ -466,8 +466,8 @@ function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTot
         }
         const passed = results.filter(r => r === 'success').length;
         const failed = results.filter(r => r !== 'success').length;
-        const resultsStr = results.length > 0 ? ` · ✅ ${passed} ❌ ${failed}` : '';
-        repeatEl.textContent = `Run ${repeatCurrent}/${repeatTotal}${resultsStr}`;
+        const resultsStr = results.length > 0 ? ` · <span class="count-pass">${passed}</span> <span class="count-fail">${failed}</span>` : '';
+        repeatEl.innerHTML = `Run ${repeatCurrent}/${repeatTotal}${resultsStr}`;
     }
 }
 
