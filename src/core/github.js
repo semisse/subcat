@@ -43,7 +43,7 @@ async function fetchPRRuns(owner, repo, prNumber, token) {
                 name: r.name,
                 status: r.status,
                 conclusion: r.conclusion,
-                url: r.html_url,
+                url: `https://github.com/${owner}/${repo}/actions/runs/${r.id}`,
             });
         }
     }
