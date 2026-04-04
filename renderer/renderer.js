@@ -248,10 +248,23 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
             <span class="pr-detail-run-name">${escapeHtml(label)}</span>
             <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
             <div class="pr-detail-run-actions">
+                <button class="rerun-btn rerun-direct-btn">↩ Rerun</button>
                 <button class="watch-run-btn">Watch</button>
                 <button class="open-run-btn">↗</button>
             </div>
         `;
+        const rerunBtn = item.querySelector('.rerun-direct-btn');
+        rerunBtn.addEventListener('click', async () => {
+            rerunBtn.disabled = true;
+            rerunBtn.textContent = 'Starting…';
+            const r = await window.api.rerunRunDirect({ owner, repo, runId: run.runId });
+            if (r.error) {
+                rerunBtn.textContent = 'Error';
+                setTimeout(() => { rerunBtn.disabled = false; rerunBtn.textContent = '↩ Rerun'; }, 2000);
+            } else {
+                rerunBtn.textContent = 'Started';
+            }
+        });
         const watchBtn = item.querySelector('.watch-run-btn');
         watchBtn.addEventListener('click', async () => {
             watchBtn.disabled = true;

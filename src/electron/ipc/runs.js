@@ -49,6 +49,10 @@ function register({ db, poller, storage, getWindow, getUser }) {
     ipcMain.handle('cancel-run', async (event, runId) => {
         return runs.cancelRunHandler(runId, { db, poller, getToken });
     });
+
+    ipcMain.handle('rerun-run-direct', async (event, { owner, repo, runId }) => {
+        return runs.rerunRunDirect(owner, repo, runId, { getToken });
+    });
 }
 
 module.exports = { register };

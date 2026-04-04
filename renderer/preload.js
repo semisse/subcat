@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
     onRunRestored: (callback) => ipcRenderer.on('run-restored', (_, data) => callback(data)),
     saveReport: (runId) => ipcRenderer.invoke('save-report', runId),
     savePRWorkflowReport: (data) => ipcRenderer.invoke('save-pr-workflow-report', data),
+    rerunRunDirect: (opts) => ipcRenderer.invoke('rerun-run-direct', opts),
 
     getVersion: () => ipcRenderer.invoke('get-version'),
     showAbout: () => ipcRenderer.invoke('show-about'),

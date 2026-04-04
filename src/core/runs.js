@@ -233,6 +233,15 @@ function resumeRuns({ db, poller, getToken, sendToWindow }) {
     }
 }
 
+async function rerunRunDirect(owner, repo, runId, { getToken }) {
+    try {
+        await rerunWorkflow(owner, repo, runId, getToken());
+        return { started: true };
+    } catch (err) {
+        return { error: err.message };
+    }
+}
+
 module.exports = {
     startWatching,
     stopWatching,
@@ -242,5 +251,6 @@ module.exports = {
     fetchUserPRsHandler,
     fetchPRRunsHandler,
     fetchWorkflowPRRunsHandler,
+    rerunRunDirect,
     resumeRuns,
 };

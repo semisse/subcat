@@ -37,7 +37,7 @@ function register({ db, getWindow }) {
     ipcMain.handle('save-pr-workflow-report', async (event, { workflowName, runs }) => {
         const { filePath } = await dialog.showSaveDialog(getWindow(), {
             title: 'Save Workflow Report',
-            defaultPath: `subcat-report-${workflowName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.md`,
+            defaultPath: `subcat-report-${workflowName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0,19).replace(/[T:]/g, '-')}.md`,
             filters: [{ name: 'Markdown', extensions: ['md'] }],
         });
 
