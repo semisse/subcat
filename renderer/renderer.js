@@ -234,13 +234,14 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
         return;
     }
 
-    for (const run of result.runs) {
+    for (const [i, run] of result.runs.entries()) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
         const item = document.createElement('div');
         item.className = 'pr-detail-run';
+        const label = run.runNumber ? `Run #${run.runNumber}` : `Run ${i + 1}`;
         item.innerHTML = `
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
-            <span class="pr-detail-run-name">#${run.runNumber}</span>
+            <span class="pr-detail-run-name">${escapeHtml(label)}</span>
             <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
             <div class="pr-detail-run-actions">
                 <button class="watch-run-btn">Watch</button>
