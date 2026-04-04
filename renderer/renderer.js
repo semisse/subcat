@@ -100,12 +100,34 @@ async function loadUserPRs() {
         const item = document.createElement('div');
         item.className = 'my-pr-item';
         item.innerHTML = `
-            <span class="my-pr-title">${escapeHtml(pr.title)}</span>
-            <span class="my-pr-number">#${pr.number}</span>
+            <div class="pr-item-info">
+                <div class="my-pr-meta">${escapeHtml(pr.owner)}/${escapeHtml(pr.repo)} · #${pr.number}</div>
+                <div class="my-pr-title">${escapeHtml(pr.title)}</div>
+            </div>
+            <div class="pr-ci-badge">
+                <span class="status-dot in_progress"></span>
+            </div>
         `;
         item.addEventListener('click', () => openPRDetail(pr));
         myPrsList.appendChild(item);
+
+        window.api.fetchPRRuns(`https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`)
+            .then(r => {
+                const dot = item.querySelector('.status-dot');
+                if (!dot) return;
+                dot.className = `status-dot ${r.error || !r.runs?.length ? '' : aggregatePRStatus(r.runs)}`;
+            })
+            .catch(() => {
+                const dot = item.querySelector('.status-dot');
+                if (dot) dot.className = 'status-dot';
+            });
     }
+}
+
+function aggregatePRStatus(runs) {
+    if (runs.some(r => r.status !== 'completed')) return 'in_progress';
+    if (runs.some(r => ['failure', 'timed_out', 'startup_failure'].includes(r.conclusion))) return 'failure';
+    return 'success';
 }
 
 function updateSectionVisibility() {
@@ -157,15 +179,14 @@ async function openPRDetail(pr) {
 
     for (const run of result.runs) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
-        const statusText = run.status === 'completed' ? (run.conclusion ?? 'completed') : run.status;
         const item = document.createElement('div');
         item.className = 'pr-detail-run';
         item.innerHTML = `
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
             <span class="pr-detail-run-name">${escapeHtml(run.name)}</span>
-            <span class="pr-detail-run-status">${escapeHtml(statusText)}</span>
+            <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
             <div class="pr-detail-run-actions">
-                <button class="watch-run-btn">Watch</button>
+                <button class="watch-run-btn">Add to Watching</button>
                 <button class="open-run-btn">↗</button>
             </div>
         `;
