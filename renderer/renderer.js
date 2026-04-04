@@ -375,9 +375,26 @@ function getCardClass(status, conclusion) {
     return 'in-progress';
 }
 
+const STATUS_LABELS = {
+    queued: 'Queued',
+    in_progress: 'Running',
+    waiting: 'Waiting',
+    pending: 'Pending',
+    requested: 'Requested',
+    success: 'Passed',
+    failure: 'Failed',
+    cancelled: 'Cancelled',
+    timed_out: 'Timed out',
+    action_required: 'Action required',
+    neutral: 'Neutral',
+    skipped: 'Skipped',
+    stale: 'Stale',
+    startup_failure: 'Startup failed',
+};
+
 function formatStatus(status, conclusion) {
-    if (status === 'completed') return conclusion;
-    return status.replace(/_/g, ' ');
+    const key = status === 'completed' ? conclusion : status;
+    return STATUS_LABELS[key] ?? (key ?? '').replace(/_/g, ' ');
 }
 
 function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTotal, results = []) {
