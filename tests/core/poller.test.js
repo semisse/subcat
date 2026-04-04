@@ -1,13 +1,22 @@
-let poller, github, db;
+let PollManager, github, db, poller;
+
+function makeDbMock() {
+    return {
+        addRunResult: jest.fn(),
+        updateRun: jest.fn(),
+        removeRun: jest.fn(),
+        clearRunResults: jest.fn(),
+    };
+}
 
 beforeEach(() => {
     jest.resetModules();
-    jest.mock('../github');
-    jest.mock('../db');
-    github = require('../github');
-    db = require('../db');
+    jest.mock('../../src/core/github');
+    github = require('../../src/core/github');
     github.delay.mockResolvedValue(undefined);
-    poller = require('../poller');
+    PollManager = require('../../src/core/poller');
+    db = makeDbMock();
+    poller = new PollManager(db);
 });
 
 function makeRun(overrides = {}) {

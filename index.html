@@ -621,6 +621,177 @@
             flex-shrink: 0;
         }
 
+        .my-prs-section {
+            flex-shrink: 0;
+        }
+
+        .my-prs-header {
+            margin-bottom: 6px;
+        }
+
+        .my-prs-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            -webkit-app-region: no-drag;
+        }
+
+        .back-btn:hover { color: #fff; }
+
+        .pr-detail-title {
+            font-size: 12px;
+            color: #ccc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 440px;
+        }
+
+        .my-prs-list {
+            max-height: 144px;
+            overflow-y: auto;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .my-prs-list.scrollable {
+            overflow-y: auto;
+        }
+
+        .my-pr-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #1e1e30;
+            transition: background 0.15s;
+            -webkit-app-region: no-drag;
+        }
+
+        .my-pr-item:last-child { border-bottom: none; }
+
+        .my-pr-item:hover { background: rgba(255,255,255,0.04); }
+
+        .my-pr-title {
+            font-size: 12px;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        .my-pr-number {
+            font-size: 11px;
+            color: #555;
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+
+        .pr-detail-list {
+            overflow-y: auto;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            flex: 1;
+        }
+
+        .pr-detail-run {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #1e1e30;
+        }
+
+        .pr-detail-run:last-child { border-bottom: none; }
+
+        .pr-detail-run-name {
+            font-size: 12px;
+            color: #e0e0e0;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pr-detail-run-status {
+            font-size: 11px;
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .pr-detail-run-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .pr-detail-run-actions button {
+            background: none;
+            border: 1px solid #444;
+            color: #aaa;
+            border-radius: 5px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s;
+            -webkit-app-region: no-drag;
+        }
+
+        .pr-detail-run-actions button:hover {
+            color: #fff;
+            border-color: #888;
+        }
+
+        .pr-detail-run-actions .watch-run-btn {
+            border-color: #533483;
+            color: #a78bfa;
+        }
+
+        .pr-detail-run-actions .watch-run-btn:hover {
+            background: rgba(83,52,131,0.2);
+            border-color: #a78bfa;
+            color: #c4b5fd;
+        }
+
+        .pr-detail-run-actions .watch-run-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pr-detail-empty, .pr-detail-loading {
+            padding: 12px;
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: #1e1e30;
+            margin: 12px 0;
+        }
+
         .error-msg {
             background: rgba(231, 76, 60, 0.15);
             border: 1px solid rgba(231, 76, 60, 0.3);
@@ -645,6 +816,21 @@
             <button class="refresh-btn" id="refreshBtn" title="Refresh runs">↻</button>
             <button class="logout-btn" id="logoutBtn">Logout</button>
         </div>
+    </div>
+
+    <div class="my-prs-section" id="myPrsSection" style="display:none;">
+        <div class="my-prs-header">
+            <div class="my-prs-nav" id="myPrsNav">
+                <span class="section-label">My PRs</span>
+            </div>
+            <div class="my-prs-nav pr-detail-nav" id="prDetailNav" style="display:none;">
+                <button class="back-btn" id="prDetailBack">←</button>
+                <span class="pr-detail-title" id="prDetailTitle"></span>
+            </div>
+        </div>
+        <div class="my-prs-list" id="myPrsList"></div>
+        <div class="pr-detail-list" id="prDetailList" style="display:none;"></div>
+        <div class="section-divider"></div>
     </div>
 
     <div class="runs-list" id="runsList"></div>

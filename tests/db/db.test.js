@@ -15,7 +15,7 @@ beforeEach(() => {
     jest.resetModules();
     jest.mock('electron');
     jest.mock('better-sqlite3');
-    db = require('../db');
+    db = require('../../src/db');
 });
 
 // ─── schema ───────────────────────────────────────────────────────────────────

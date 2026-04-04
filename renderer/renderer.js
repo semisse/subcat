@@ -1,3 +1,11 @@
+const myPrsSection = document.getElementById('myPrsSection');
+const myPrsList = document.getElementById('myPrsList');
+const myPrsNav = document.getElementById('myPrsNav');
+const prDetailNav = document.getElementById('prDetailNav');
+const prDetailBack = document.getElementById('prDetailBack');
+const prDetailTitle = document.getElementById('prDetailTitle');
+const prDetailList = document.getElementById('prDetailList');
+
 const addBtn = document.getElementById('addBtn');
 const urlForm = document.getElementById('urlForm');
 const urlInput = document.getElementById('urlInput');
@@ -66,6 +74,107 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 initUser();
+loadUserPRs();
+
+async function loadUserPRs() {
+    const result = await window.api.fetchUserPRs();
+    if (result.error || !result.prs?.length) return;
+
+    myPrsSection.style.display = 'block';
+    myPrsList.innerHTML = '';
+
+    if (result.prs.length > 4) myPrsList.classList.add('scrollable');
+
+    for (const pr of result.prs) {
+        const item = document.createElement('div');
+        item.className = 'my-pr-item';
+        item.innerHTML = `
+            <span class="my-pr-title">${escapeHtml(pr.title)}</span>
+            <span class="my-pr-number">#${pr.number}</span>
+        `;
+        item.addEventListener('click', () => openPRDetail(pr));
+        myPrsList.appendChild(item);
+    }
+}
+
+function showMainView() {
+    myPrsList.style.display = '';
+    prDetailList.style.display = 'none';
+    prDetailNav.style.display = 'none';
+    myPrsNav.style.display = 'flex';
+    prDetailList.innerHTML = '';
+    prDetailTitle.textContent = '';
+    runsList.style.display = '';
+    emptyState.style.display = watchedRuns.size === 0 ? 'flex' : 'none';
+    document.querySelector('.input-section').style.display = '';
+}
+
+function showPRDetailView() {
+    myPrsList.style.display = 'none';
+    prDetailList.style.display = 'block';
+    myPrsNav.style.display = 'none';
+    prDetailNav.style.display = 'flex';
+    runsList.style.display = 'none';
+    emptyState.style.display = 'none';
+    document.querySelector('.input-section').style.display = 'none';
+}
+
+async function openPRDetail(pr) {
+    showPRDetailView();
+    prDetailTitle.textContent = `${pr.title} #${pr.number}`;
+    prDetailList.innerHTML = '<div class="pr-detail-loading">Loading workflows…</div>';
+
+    const result = await window.api.fetchPRRuns(`https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`);
+    prDetailList.innerHTML = '';
+
+    if (result.error || !result.runs?.length) {
+        prDetailList.innerHTML = '<div class="pr-detail-empty">No workflows found.</div>';
+        return;
+    }
+
+    for (const run of result.runs) {
+        const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
+        const statusText = run.status === 'completed' ? (run.conclusion ?? 'completed') : run.status;
+        const item = document.createElement('div');
+        item.className = 'pr-detail-run';
+        item.innerHTML = `
+            <span class="status-dot ${escapeHtml(dotClass)}"></span>
+            <span class="pr-detail-run-name">${escapeHtml(run.name)}</span>
+            <span class="pr-detail-run-status">${escapeHtml(statusText)}</span>
+            <div class="pr-detail-run-actions">
+                <button class="watch-run-btn">Watch</button>
+                <button class="open-run-btn">↗</button>
+            </div>
+        `;
+        const watchBtn = item.querySelector('.watch-run-btn');
+        watchBtn.addEventListener('click', async () => {
+            watchBtn.disabled = true;
+            watchBtn.textContent = '…';
+            const r = await window.api.startWatching({ url: run.url, repeatTotal: 1 });
+            console.log('[watch]', run.url, r);
+            if (r.error) {
+                watchBtn.textContent = r.error === 'This run is already in the list.' ? 'Already added' : 'Error';
+                setTimeout(() => {
+                    watchBtn.disabled = false;
+                    watchBtn.textContent = 'Watch';
+                }, 2000);
+            } else if (r.started) {
+                watchBtn.textContent = 'Added';
+                showMainView();
+                if (r.status === 'completed') {
+                    addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion]);
+                    applyCompletedState(r.runId, { repeatTotal: 1, failed: r.failed, failedTests: r.failedTests });
+                } else {
+                    addRunCard(r.runId, r.name, r.status, null, r.url, r.repeatTotal);
+                }
+            }
+        });
+        item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
+        prDetailList.appendChild(item);
+    }
+}
+
+prDetailBack.addEventListener('click', showMainView);
 
 addBtn.addEventListener('click', () => {
     urlForm.style.display = 'block';

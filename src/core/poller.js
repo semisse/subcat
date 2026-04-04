@@ -1,6 +1,5 @@
 const { EventEmitter } = require('events');
 const { fetchRunStatus, fetchFailedTests, rerunWorkflow, delay } = require('./github');
-const db = require('./db');
 
 const POLL_INTERVAL_MS = 15_000;
 const TRANSIENT_ERRORS = new Set(['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED']);
@@ -8,6 +7,12 @@ const isTransient = err => TRANSIENT_ERRORS.has(err.code) || err.status === 429;
 
 class PollManager extends EventEmitter {
     #active = new Set();
+    #db;
+
+    constructor(db) {
+        super();
+        this.#db = db;
+    }
 
     start({ runId, currentRunId, owner, repo, runNumber, repeatTotal, name, url, results = [], reportRows = [] }, getToken) {
         if (this.#active.has(runId)) return false;
@@ -23,7 +28,7 @@ class PollManager extends EventEmitter {
 
     stop(runId) {
         this.#active.delete(runId);
-        db.removeRun(runId);
+        this.#db.removeRun(runId);
     }
 
     deactivate(runId) {
@@ -69,7 +74,7 @@ class PollManager extends EventEmitter {
                     failedTests,
                 }];
 
-                db.addRunResult({
+                this.#db.addRunResult({
                     runId, number: runNumber,
                     conclusion: run.conclusion,
                     url: run.html_url,
@@ -89,7 +94,7 @@ class PollManager extends EventEmitter {
                 if (runNumber < repeatTotal) {
                     await rerunWorkflow(owner, repo, currentRunId, getToken());
                     runNumber++;
-                    db.updateRun(runId, { runNumber });
+                    this.#db.updateRun(runId, { runNumber });
 
                     const newRun = await fetchRunStatus(owner, repo, currentRunId, getToken()).catch(() => null);
                     this.emit('run:update', {
@@ -103,7 +108,7 @@ class PollManager extends EventEmitter {
                     });
                 } else {
                     this.#active.delete(runId);
-                    db.updateRun(runId, { status: 'completed' });
+                    this.#db.updateRun(runId, { status: 'completed' });
 
                     const passed = results.filter(r => r === 'success').length;
                     const lastRow = reportRows[reportRows.length - 1];
@@ -118,7 +123,7 @@ class PollManager extends EventEmitter {
             } catch (err) {
                 if (isTransient(err)) continue;
                 this.#active.delete(runId);
-                db.updateRun(runId, { status: 'error' });
+                this.#db.updateRun(runId, { status: 'error' });
                 this.emit('run:error', { runId, error: err.message });
                 break;
             }
@@ -126,4 +131,4 @@ class PollManager extends EventEmitter {
     }
 }
 
-module.exports = new PollManager();
+module.exports = PollManager;

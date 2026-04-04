@@ -14,6 +14,18 @@ function parsePRUrl(url) {
     return { owner: match[1], repo: match[2], prNumber: match[3] };
 }
 
+async function fetchUserPRs(login, token) {
+    const data = await githubGet(
+        `/search/issues?q=is:pr+is:open+author:${encodeURIComponent(login)}&per_page=20&sort=updated`,
+        token
+    );
+    return data.items.map(pr => {
+        const repoPath = pr.repository_url.replace('https://api.github.com/repos/', '');
+        const [owner, repo] = repoPath.split('/');
+        return { number: pr.number, title: pr.title, owner, repo, url: pr.html_url };
+    });
+}
+
 async function fetchPRRuns(owner, repo, prNumber, token) {
     const pr = await githubGet(`/repos/${owner}/${repo}/pulls/${prNumber}`, token);
     const { workflow_runs } = await githubGet(
@@ -167,4 +179,4 @@ function rerunFailedJobs(owner, repo, runId, token) {
     });
 }
 
-module.exports = { delay, parseGitHubUrl, parsePRUrl, githubGet, fetchRunStatus, fetchPRRuns, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };
+module.exports = { delay, parseGitHubUrl, parsePRUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

@@ -1,37 +1,6 @@
-const { safeStorage } = require('electron');
 const https = require('https');
-const fs = require('fs');
-const path = require('path');
 
 const CLIENT_ID = 'Ov23lixvphyDMyJW3UUm';
-
-function getTokenFile() {
-    return path.join(require('electron').app.getPath('userData'), 'auth.enc');
-}
-
-function storeToken(token) {
-    if (!safeStorage.isEncryptionAvailable()) {
-        throw new Error('OS encryption not available');
-    }
-    const encrypted = safeStorage.encryptString(token);
-    fs.writeFileSync(getTokenFile(), encrypted, { mode: 0o600 });
-}
-
-function loadToken() {
-    try {
-        const tokenFile = getTokenFile();
-        if (!fs.existsSync(tokenFile)) return null;
-        if (!safeStorage.isEncryptionAvailable()) return null;
-        const encrypted = fs.readFileSync(tokenFile);
-        return safeStorage.decryptString(encrypted);
-    } catch {
-        return null;
-    }
-}
-
-function clearToken() {
-    try { fs.unlinkSync(getTokenFile()); } catch {}
-}
 
 function postForm(hostname, urlPath, params) {
     const body = new URLSearchParams(params).toString();
@@ -126,11 +95,4 @@ async function pollForToken(deviceCode, interval) {
     throw new Error('Login timed out after 10 minutes.');
 }
 
-module.exports = {
-    storeToken,
-    loadToken,
-    clearToken,
-    fetchUser,
-    startDeviceFlow,
-    pollForToken
-};
+module.exports = { fetchUser, startDeviceFlow, pollForToken };

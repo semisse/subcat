@@ -3,7 +3,7 @@
   "version": "1.0.9",
   "description": "Get notified when a GitHub Actions CI run finishes",
   "author": "Samuel Fialho",
-  "main": "main.js",
+  "main": "src/electron/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",

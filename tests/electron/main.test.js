@@ -46,26 +46,30 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         shell: { openExternal: jest.fn() },
         dialog,
     }));
-    jest.doMock('../auth', () => ({
-        loadToken: jest.fn(() => token),
-        storeToken: jest.fn(),
-        clearToken: jest.fn(),
+    jest.doMock('../../src/core/auth', () => ({
         fetchUser: fetchUserResult
             ? jest.fn().mockResolvedValue(fetchUserResult)
             : jest.fn().mockRejectedValue(new Error('no user')),
         startDeviceFlow: jest.fn(),
         pollForToken: jest.fn(),
     }));
-    jest.doMock('../github', () => ({
+    jest.doMock('../../src/electron/storage', () => ({
+        loadToken: jest.fn(() => token),
+        storeToken: jest.fn(),
+        clearToken: jest.fn(),
+    }));
+    jest.doMock('../../src/core/github', () => ({
         parseGitHubUrl: jest.fn(),
         parsePRUrl: jest.fn(),
         fetchRunStatus: jest.fn(),
+        fetchUserPRs: jest.fn(),
         fetchPRRuns: jest.fn(),
         fetchFailedTests: jest.fn(),
         rerunWorkflow: jest.fn(),
         rerunFailedJobs: jest.fn(),
         cancelRun: jest.fn(),
     }));
+
     const db = {
         getAllRuns: jest.fn(() => []),
         getRun: jest.fn(),
@@ -77,16 +81,31 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         getReport: jest.fn(),
         getRunResults: jest.fn(() => []),
     };
-    jest.doMock('../db', () => db);
-    jest.doMock('../poller', () => ({
+    jest.doMock('../../src/db', () => db);
+
+    const pollerInstance = {
         on: jest.fn(),
         start: jest.fn(),
         stop: jest.fn(),
         deactivate: jest.fn(),
         isActive: jest.fn(() => false),
+    };
+    jest.doMock('../../src/core/poller', () => jest.fn(() => pollerInstance));
+
+    jest.doMock('../../src/core/runs', () => ({
+        startWatching: jest.fn(),
+        stopWatching: jest.fn(),
+        rerunRun: jest.fn(),
+        rerunFailedRun: jest.fn(),
+        cancelRunHandler: jest.fn(),
+        fetchUserPRsHandler: jest.fn(),
+        fetchPRRunsHandler: jest.fn(),
+        resumeRuns: jest.fn(),
     }));
 
-    return { autoUpdater, dialog, BrowserWindow, app, db, ipcHandlers };
+    jest.doMock('../../src/electron/notifications', () => ({ register: jest.fn() }));
+
+    return { autoUpdater, dialog, BrowserWindow, app, db, ipcHandlers, poller: pollerInstance };
 }
 
 // ─── autoUpdater: update-downloaded ──────────────────────────────────────────
@@ -95,9 +114,9 @@ describe('autoUpdater update-downloaded', () => {
     beforeEach(() => jest.resetModules());
 
     test('calls showMessageBox with undefined parent when mainWindow has not been created', async () => {
-        const { autoUpdater, dialog } = buildMocks(); // no token → loginWindow created, mainWindow stays null
-        require('../main');
-        await Promise.resolve(); // flush whenReady handler
+        const { autoUpdater, dialog } = buildMocks();
+        require('../../src/electron/main');
+        await Promise.resolve();
 
         dialog.showMessageBox.mockResolvedValue({ response: 1 });
         autoUpdater.emit('update-downloaded');
@@ -110,7 +129,7 @@ describe('autoUpdater update-downloaded', () => {
 
     test('never passes null as the dialog parent (the bug that was fixed)', async () => {
         const { autoUpdater, dialog } = buildMocks();
-        require('../main');
+        require('../../src/electron/main');
         await Promise.resolve();
 
         dialog.showMessageBox.mockResolvedValue({ response: 1 });
@@ -125,8 +144,7 @@ describe('autoUpdater update-downloaded', () => {
             token: 'mock-token',
             fetchUserResult: { login: 'semisse', avatar_url: 'https://example.com/avatar.png' },
         });
-        require('../main');
-        // whenReady resolves → async handler starts → await fetchUser → createMainWindow
+        require('../../src/electron/main');
         await Promise.resolve(); // tick 1: whenReady microtask
         await Promise.resolve(); // tick 2: fetchUser await
         await Promise.resolve(); // tick 3: createMainWindow + rest of handler
@@ -140,19 +158,19 @@ describe('autoUpdater update-downloaded', () => {
 
     test('calls quitAndInstall when user selects Restart (response 0)', async () => {
         const { autoUpdater, dialog } = buildMocks();
-        require('../main');
+        require('../../src/electron/main');
         await Promise.resolve();
 
         dialog.showMessageBox.mockResolvedValue({ response: 0 });
         autoUpdater.emit('update-downloaded');
-        await Promise.resolve(); // flush showMessageBox.then()
+        await Promise.resolve();
 
         expect(autoUpdater.quitAndInstall).toHaveBeenCalled();
     });
 
     test('does not call quitAndInstall when user selects Later (response 1)', async () => {
         const { autoUpdater, dialog } = buildMocks();
-        require('../main');
+        require('../../src/electron/main');
         await Promise.resolve();
 
         dialog.showMessageBox.mockResolvedValue({ response: 1 });
@@ -164,7 +182,7 @@ describe('autoUpdater update-downloaded', () => {
 
     test('shows the update dialog with the correct options', async () => {
         const { autoUpdater, dialog } = buildMocks();
-        require('../main');
+        require('../../src/electron/main');
         await Promise.resolve();
 
         dialog.showMessageBox.mockResolvedValue({ response: 1 });
@@ -183,82 +201,48 @@ describe('autoUpdater update-downloaded', () => {
 // ─── rerun handlers: clearRunResults ─────────────────────────────────────────
 
 describe('rerun handlers clear previous results', () => {
-    const RUN = {
-        id: '42', current_run_id: '42',
-        owner: 'owner', repo: 'repo',
-        name: 'My Workflow', url: 'https://github.com/owner/repo/actions/runs/42',
-        repeat_total: 3,
-    };
-
-    let db, ipcHandlers, github;
+    let db, ipcHandlers, runsModule;
 
     beforeEach(() => {
         jest.resetModules();
         ({ db, ipcHandlers } = buildMocks());
-        require('../main');
-
-        github = require('../github');
-        github.rerunWorkflow.mockResolvedValue(undefined);
-        github.rerunFailedJobs.mockResolvedValue(undefined);
+        require('../../src/electron/main');
+        runsModule = require('../../src/core/runs');
     });
 
     describe('rerun-run', () => {
-        test('clears previous run_results before restarting', async () => {
-            db.getRun.mockReturnValue(RUN);
+        test('delegates to runs.rerunRun with correct runId', async () => {
+            runsModule.rerunRun.mockResolvedValue({ started: true, status: 'queued' });
 
             await ipcHandlers['rerun-run'](null, '42');
 
-            expect(db.clearRunResults).toHaveBeenCalledWith('42');
+            expect(runsModule.rerunRun).toHaveBeenCalledWith('42', expect.objectContaining({ db }));
         });
 
-        test('clears results before updating run status', async () => {
-            db.getRun.mockReturnValue(RUN);
-            const order = [];
-            db.clearRunResults.mockImplementation(() => order.push('clear'));
-            db.updateRun.mockImplementation(() => order.push('update'));
+        test('returns error when runs.rerunRun returns error', async () => {
+            runsModule.rerunRun.mockResolvedValue({ error: 'Run not found.' });
 
-            await ipcHandlers['rerun-run'](null, '42');
-
-            expect(order).toEqual(['clear', 'update']);
-        });
-
-        test('returns error without clearing if run not found', async () => {
-            db.getRun.mockReturnValue(null);
-
-            const result = await ipcHandlers['rerun-run'](null, '42');
+            const result = await ipcHandlers['rerun-run'](null, '99');
 
             expect(result).toEqual({ error: 'Run not found.' });
-            expect(db.clearRunResults).not.toHaveBeenCalled();
         });
     });
 
     describe('rerun-failed-run', () => {
-        test('clears previous run_results before restarting', async () => {
-            db.getRun.mockReturnValue(RUN);
+        test('delegates to runs.rerunFailedRun with correct runId', async () => {
+            runsModule.rerunFailedRun.mockResolvedValue({ started: true, status: 'queued' });
 
             await ipcHandlers['rerun-failed-run'](null, '42');
 
-            expect(db.clearRunResults).toHaveBeenCalledWith('42');
+            expect(runsModule.rerunFailedRun).toHaveBeenCalledWith('42', expect.objectContaining({ db }));
         });
 
-        test('clears results before updating run status', async () => {
-            db.getRun.mockReturnValue(RUN);
-            const order = [];
-            db.clearRunResults.mockImplementation(() => order.push('clear'));
-            db.updateRun.mockImplementation(() => order.push('update'));
+        test('returns error when runs.rerunFailedRun returns error', async () => {
+            runsModule.rerunFailedRun.mockResolvedValue({ error: 'Run not found.' });
 
-            await ipcHandlers['rerun-failed-run'](null, '42');
-
-            expect(order).toEqual(['clear', 'update']);
-        });
-
-        test('returns error without clearing if run not found', async () => {
-            db.getRun.mockReturnValue(null);
-
-            const result = await ipcHandlers['rerun-failed-run'](null, '42');
+            const result = await ipcHandlers['rerun-failed-run'](null, '99');
 
             expect(result).toEqual({ error: 'Run not found.' });
-            expect(db.clearRunResults).not.toHaveBeenCalled();
         });
     });
 });

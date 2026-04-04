@@ -1,6 +1,6 @@
 jest.mock('https');
 const https = require('https');
-const { parseGitHubUrl, parsePRUrl, githubGet, fetchFailedTests, fetchPRRuns, rerunWorkflow, rerunFailedJobs, cancelRun } = require('../github');
+const { parseGitHubUrl, parsePRUrl, githubGet, fetchFailedTests, fetchPRRuns, rerunWorkflow, rerunFailedJobs, cancelRun } = require('../../src/core/github');
 
 // Helper to create a mock https response
 function mockResponse(statusCode, body) {
