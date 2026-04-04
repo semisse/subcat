@@ -54,7 +54,7 @@ async function fetchPRRuns(owner, repo, prNumber, token) {
 
 async function fetchWorkflowRunsForPR(owner, repo, workflowId, headRef, token) {
     const { workflow_runs } = await githubGet(
-        `/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs?branch=${encodeURIComponent(headRef)}&event=pull_request&per_page=100`,
+        `/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs?branch=${encodeURIComponent(headRef)}&per_page=30`,
         token
     );
     return workflow_runs.map(r => ({
