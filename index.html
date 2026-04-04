@@ -750,6 +750,25 @@
 
         .pr-detail-run:last-child { border-bottom: none; }
 
+        .pr-detail-run.drillable {
+            cursor: pointer;
+        }
+
+        .pr-detail-run.drillable:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .pr-drill-chevron {
+            font-size: 14px;
+            color: #444;
+            flex-shrink: 0;
+            margin-left: 2px;
+        }
+
+        .pr-detail-run.drillable:hover .pr-drill-chevron {
+            color: #888;
+        }
+
         .pr-detail-run-name {
             font-size: 12px;
             color: #e0e0e0;

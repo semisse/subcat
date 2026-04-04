@@ -202,12 +202,12 @@ async function openPRDetail(pr) {
     for (const run of result.runs) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
         const item = document.createElement('div');
-        item.className = 'pr-detail-run';
-        item.style.cursor = 'pointer';
+        item.className = 'pr-detail-run drillable';
         item.innerHTML = `
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
             <span class="pr-detail-run-name">${escapeHtml(run.name)}</span>
             <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
+            <span class="pr-drill-chevron">›</span>
             <div class="pr-detail-run-actions">
                 <button class="open-run-btn">↗</button>
             </div>
