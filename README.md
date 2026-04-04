@@ -4,6 +4,11 @@
 
 # SubCat
 
+<p align="center">
+  <a href="https://github.com/sponsors/semisse"><img src="https://img.shields.io/badge/sponsor-♥-ea4aaa?style=flat-square" alt="Sponsor"></a>
+  <a href="https://ko-fi.com/semisse"><img src="https://img.shields.io/badge/Ko--fi-donate-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+</p>
+
 A macOS app that monitors GitHub Actions runs and sends native notifications when they finish.
 
 ## Install
