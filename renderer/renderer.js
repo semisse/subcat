@@ -197,7 +197,7 @@ async function openPRDetail(pr) {
         return;
     }
 
-    currentPRContext = { owner: result.owner, repo: result.repo, headSha: result.headSha };
+    currentPRContext = { owner: result.owner, repo: result.repo, headRef: result.headRef };
 
     for (const run of result.runs) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
@@ -221,12 +221,12 @@ async function openPRDetail(pr) {
     }
 }
 
-async function openWorkflowRuns(workflow, { owner, repo, headSha }) {
+async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
     showWorkflowRunsView();
     workflowRunsTitle.textContent = workflow.name;
     workflowRunsList.innerHTML = '<div class="pr-detail-loading">Loading runs…</div>';
 
-    const result = await window.api.fetchWorkflowPRRuns({ owner, repo, workflowId: workflow.workflowId, headSha });
+    const result = await window.api.fetchWorkflowPRRuns({ owner, repo, workflowId: workflow.workflowId, headRef });
     workflowRunsList.innerHTML = '';
 
     if (result.error || !result.runs?.length) {

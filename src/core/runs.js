@@ -170,9 +170,9 @@ async function fetchPRRunsHandler(url, { getToken }) {
     }
 }
 
-async function fetchWorkflowPRRunsHandler({ owner, repo, workflowId, headSha }, { getToken }) {
+async function fetchWorkflowPRRunsHandler({ owner, repo, workflowId, headRef }, { getToken }) {
     try {
-        const runs = await fetchWorkflowRunsForPR(owner, repo, workflowId, headSha, getToken());
+        const runs = await fetchWorkflowRunsForPR(owner, repo, workflowId, headRef, getToken());
         return { runs };
     } catch (err) {
         return { error: err.message };

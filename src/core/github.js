@@ -49,12 +49,12 @@ async function fetchPRRuns(owner, repo, prNumber, token) {
             });
         }
     }
-    return { runs: unique, owner, repo, headSha };
+    return { runs: unique, owner, repo, headSha, headRef: pr.head.ref };
 }
 
-async function fetchWorkflowRunsForPR(owner, repo, workflowId, headSha, token) {
+async function fetchWorkflowRunsForPR(owner, repo, workflowId, headRef, token) {
     const { workflow_runs } = await githubGet(
-        `/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs?head_sha=${headSha}&per_page=10`,
+        `/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs?branch=${encodeURIComponent(headRef)}&event=pull_request&per_page=100`,
         token
     );
     return workflow_runs.map(r => ({
