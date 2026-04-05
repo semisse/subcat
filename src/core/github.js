@@ -52,19 +52,25 @@ async function fetchPRRuns(owner, repo, prNumber, token) {
     return { runs: unique, owner, repo, headSha, headRef: pr.head.ref };
 }
 
-async function fetchWorkflowRunsForPR(owner, repo, workflowId, headRef, token) {
-    const { workflow_runs } = await githubGet(
-        `/repos/${owner}/${repo}/actions/workflows/${workflowId}/runs?branch=${encodeURIComponent(headRef)}&per_page=30`,
-        token
+async function fetchRunAttempts(owner, repo, runId, token) {
+    const run = await githubGet(`/repos/${owner}/${repo}/actions/runs/${runId}`, token);
+    const total = run.run_attempt;
+
+    const attempts = await Promise.all(
+        Array.from({ length: total }, (_, i) => {
+            const attempt = total - i; // newest first
+            return githubGet(`/repos/${owner}/${repo}/actions/runs/${runId}/attempts/${attempt}`, token)
+                .then(r => ({
+                    runId: String(runId),
+                    runAttempt: r.run_attempt,
+                    status: r.status,
+                    conclusion: r.conclusion,
+                    url: `https://github.com/${owner}/${repo}/actions/runs/${runId}/attempts/${r.run_attempt}`,
+                }));
+        })
     );
-    return workflow_runs.map(r => ({
-        runId: String(r.id),
-        runNumber: r.run_number,
-        runAttempt: r.run_attempt,
-        status: r.status,
-        conclusion: r.conclusion,
-        url: `https://github.com/${owner}/${repo}/actions/runs/${r.id}`,
-    }));
+
+    return { attempts, totalAttempts: total };
 }
 
 function githubGet(path, token) {
@@ -196,4 +202,4 @@ function rerunFailedJobs(owner, repo, runId, token) {
     });
 }
 
-module.exports = { delay, parseGitHubUrl, parsePRUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchWorkflowRunsForPR, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };
+module.exports = { delay, parseGitHubUrl, parsePRUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

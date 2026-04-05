@@ -52,10 +52,11 @@ function register({ db, getWindow }) {
             '',
             '| Attempt | Result | Link |',
             '|---------|--------|------|',
-            ...runs.map(r => {
+            ...runs.map((r, i) => {
                 const emoji = r.conclusion === 'success' ? '✅' : r.conclusion ? '❌' : '🔄';
                 const result = r.conclusion ?? r.status ?? '—';
-                return `| #${r.runAttempt ?? r.runNumber} | ${emoji} ${result} | [Open](${r.url}) |`;
+                const attempt = runs.length - i;
+                return `| #${attempt} | ${emoji} ${result} | [Open](${r.url}) |`;
             }),
         ];
         fs.writeFileSync(filePath, lines.join('\n'), 'utf8');

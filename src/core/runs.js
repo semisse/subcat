@@ -1,6 +1,6 @@
 const {
     parseGitHubUrl, parsePRUrl,
-    fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchWorkflowRunsForPR, fetchFailedTests,
+    fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests,
     rerunWorkflow, rerunFailedJobs, cancelRun,
 } = require('./github');
 
@@ -170,10 +170,10 @@ async function fetchPRRunsHandler(url, { getToken }) {
     }
 }
 
-async function fetchWorkflowPRRunsHandler({ owner, repo, workflowId, headRef }, { getToken }) {
+async function fetchRunAttemptsHandler({ owner, repo, runId }, { getToken }) {
     try {
-        const runs = await fetchWorkflowRunsForPR(owner, repo, workflowId, headRef, getToken());
-        return { runs };
+        const { attempts, totalAttempts } = await fetchRunAttempts(owner, repo, runId, getToken());
+        return { runs: attempts, totalAttempts };
     } catch (err) {
         return { error: err.message };
     }
@@ -242,6 +242,31 @@ async function rerunRunDirect(owner, repo, runId, { getToken }) {
     }
 }
 
+async function watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, sendToWindow }) {
+    try {
+        await rerunWorkflow(owner, repo, runId, getToken());
+    } catch (err) {
+        return { error: err.message };
+    }
+
+    // poll run until run_attempt increases
+    (async () => {
+        const deadline = Date.now() + 30000;
+        while (Date.now() < deadline) {
+            await new Promise(res => setTimeout(res, 2000));
+            try {
+                const { totalAttempts } = await fetchRunAttempts(owner, repo, runId, getToken());
+                if (totalAttempts > previousAttemptCount) {
+                    sendToWindow('workflow-run-appeared', { owner, repo, runId });
+                    break;
+                }
+            } catch {}
+        }
+    })();
+
+    return { started: true };
+}
+
 module.exports = {
     startWatching,
     stopWatching,
@@ -250,7 +275,8 @@ module.exports = {
     cancelRunHandler,
     fetchUserPRsHandler,
     fetchPRRunsHandler,
-    fetchWorkflowPRRunsHandler,
+    fetchRunAttemptsHandler,
     rerunRunDirect,
+    watchWorkflowRerun,
     resumeRuns,
 };

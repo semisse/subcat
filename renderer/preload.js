@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld('api', {
     startWatching: (data) => ipcRenderer.invoke('start-watching', data),
     fetchUserPRs: () => ipcRenderer.invoke('fetch-user-prs'),
     fetchPRRuns: (url) => ipcRenderer.invoke('fetch-pr-runs', url),
-    fetchWorkflowPRRuns: (opts) => ipcRenderer.invoke('fetch-workflow-pr-runs', opts),
+    fetchRunAttempts: (opts) => ipcRenderer.invoke('fetch-run-attempts', opts),
     stopWatching: (runId) => ipcRenderer.invoke('stop-watching', runId),
     confirm: (title, message) => ipcRenderer.invoke('confirm-dialog', { title, message }),
     cancelRun: (runId) => ipcRenderer.invoke('cancel-run', runId),
@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
     saveReport: (runId) => ipcRenderer.invoke('save-report', runId),
     savePRWorkflowReport: (data) => ipcRenderer.invoke('save-pr-workflow-report', data),
     rerunRunDirect: (opts) => ipcRenderer.invoke('rerun-run-direct', opts),
+    watchWorkflowRerun: (opts) => ipcRenderer.invoke('watch-workflow-rerun', opts),
+    onWorkflowRunAppeared: (callback) => ipcRenderer.on('workflow-run-appeared', (_, data) => callback(data)),
 
     getVersion: () => ipcRenderer.invoke('get-version'),
     showAbout: () => ipcRenderer.invoke('show-about'),

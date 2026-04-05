@@ -10,6 +10,7 @@ const workflowRunsBack = document.getElementById('workflowRunsBack');
 const workflowRunsTitle = document.getElementById('workflowRunsTitle');
 const workflowRunsList = document.getElementById('workflowRunsList');
 const workflowRunsReportBtn = document.getElementById('workflowRunsReportBtn');
+const workflowRunsRerunBtn = document.getElementById('workflowRunsRerunBtn');
 
 const addBtn = document.getElementById('addBtn');
 const urlForm = document.getElementById('urlForm');
@@ -57,7 +58,17 @@ refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('spinning');
     refreshBtn.addEventListener('animationend', () => refreshBtn.classList.remove('spinning'), { once: true });
 
-    // clear before refresh so run-restored events populate the fresh list
+    if (currentView === 'workflow-runs' && currentWorkflow && currentPRContext) {
+        await openWorkflowRuns(currentWorkflow, currentPRContext);
+        return;
+    }
+
+    if (currentView === 'pr-detail' && currentPR) {
+        await openPRDetail(currentPR);
+        return;
+    }
+
+    // main view refresh
     runsList.innerHTML = '';
     watchedRuns.clear();
     runsList.style.display = 'none';
@@ -148,6 +159,7 @@ function getSectionItems(source) {
 }
 
 function showMainView() {
+    currentView = 'main';
     myPrsList.style.display = '';
     prDetailList.style.display = 'none';
     prDetailNav.style.display = 'none';
@@ -160,6 +172,7 @@ function showMainView() {
 }
 
 function showPRDetailView() {
+    currentView = 'pr-detail';
     myPrsList.style.display = 'none';
     prDetailList.style.display = 'block';
     workflowRunsList.style.display = 'none';
@@ -172,6 +185,7 @@ function showPRDetailView() {
 }
 
 function showWorkflowRunsView() {
+    currentView = 'workflow-runs';
     myPrsList.style.display = 'none';
     prDetailList.style.display = 'none';
     workflowRunsList.style.display = 'block';
@@ -183,10 +197,14 @@ function showWorkflowRunsView() {
     document.querySelector('.input-section').style.display = 'none';
 }
 
+let currentView = 'main';
+let currentPR = null;
 let currentPRContext = null;
+let currentWorkflow = null;
 let currentWorkflowRuns = null;
 
 async function openPRDetail(pr) {
+    currentPR = pr;
     showPRDetailView();
     prDetailTitle.textContent = `${pr.title} #${pr.number}`;
     prDetailList.innerHTML = '<div class="pr-detail-loading">Loading workflows…</div>';
@@ -224,11 +242,12 @@ async function openPRDetail(pr) {
 }
 
 async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
+    currentWorkflow = workflow;
     showWorkflowRunsView();
     workflowRunsTitle.textContent = workflow.name;
     workflowRunsList.innerHTML = '<div class="pr-detail-loading">Loading runs…</div>';
 
-    const result = await window.api.fetchWorkflowPRRuns({ owner, repo, workflowId: workflow.workflowId, headRef });
+    const result = await window.api.fetchRunAttempts({ owner, repo, runId: workflow.runId });
     workflowRunsList.innerHTML = '';
 
     if (result.error || !result.runs?.length) {
@@ -237,64 +256,74 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
     }
 
     currentWorkflowRuns = result.runs;
+    const hasActiveRun = result.runs.some(r => r.status !== 'completed');
+    workflowRunsRerunBtn.style.display = hasActiveRun ? 'none' : '';
 
     for (const [i, run] of result.runs.entries()) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
         const item = document.createElement('div');
         item.className = 'pr-detail-run';
-        const label = `Attempt #${run.runAttempt ?? (result.runs.length - i)}`;
+        const label = `#${result.runs.length - i}`;
         item.innerHTML = `
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
             <span class="pr-detail-run-name">${escapeHtml(label)}</span>
             <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
             <div class="pr-detail-run-actions">
-                <button class="rerun-btn rerun-direct-btn">↩ Rerun</button>
-                <button class="watch-run-btn">Watch</button>
                 <button class="open-run-btn">↗</button>
             </div>
         `;
-        const rerunBtn = item.querySelector('.rerun-direct-btn');
-        rerunBtn.addEventListener('click', async () => {
-            rerunBtn.disabled = true;
-            rerunBtn.textContent = 'Starting…';
-            const r = await window.api.rerunRunDirect({ owner, repo, runId: run.runId });
-            if (r.error) {
-                rerunBtn.textContent = 'Error';
-                setTimeout(() => { rerunBtn.disabled = false; rerunBtn.textContent = '↩ Rerun'; }, 2000);
-            } else {
-                rerunBtn.textContent = 'Started';
-            }
-        });
-        const watchBtn = item.querySelector('.watch-run-btn');
-        watchBtn.addEventListener('click', async () => {
-            watchBtn.disabled = true;
-            watchBtn.textContent = '…';
-            const r = await window.api.startWatching({ url: run.url, repeatTotal: 1, source: 'manual' });
-            if (r.error) {
-                watchBtn.textContent = r.error === 'This run is already in the list.' ? 'Already added' : 'Error';
-                setTimeout(() => { watchBtn.disabled = false; watchBtn.textContent = 'Watch'; }, 2000);
-            } else if (r.started) {
-                watchBtn.textContent = 'Added';
-                showMainView();
-                if (r.status === 'completed') {
-                    addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion], 'manual');
-                    applyCompletedState(r.runId, { repeatTotal: 1, failed: r.failed, failedTests: r.failedTests });
-                } else {
-                    addRunCard(r.runId, r.name, r.status, null, r.url, r.repeatTotal, 1, [], 'manual');
-                }
-            }
-        });
         item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
         workflowRunsList.appendChild(item);
     }
 }
 
 prDetailBack.addEventListener('click', showMainView);
-workflowRunsBack.addEventListener('click', showPRDetailView);
+workflowRunsBack.addEventListener('click', () => {
+    if (currentPR) openPRDetail(currentPR);
+    else showPRDetailView();
+});
 workflowRunsReportBtn.addEventListener('click', () => {
     if (currentWorkflowRuns) {
         window.api.savePRWorkflowReport({ workflowName: workflowRunsTitle.textContent, runs: currentWorkflowRuns });
     }
+});
+
+workflowRunsRerunBtn.addEventListener('click', async () => {
+    if (!currentWorkflowRuns?.length || !currentPRContext || !currentWorkflow) return;
+    workflowRunsRerunBtn.disabled = true;
+    workflowRunsRerunBtn.textContent = 'Starting…';
+    const r = await window.api.watchWorkflowRerun({
+        owner: currentPRContext.owner,
+        repo: currentPRContext.repo,
+        runId: currentWorkflowRuns[0].runId,
+        previousAttemptCount: currentWorkflowRuns.length,
+    });
+    if (r.error) {
+        workflowRunsRerunBtn.textContent = 'Error';
+        setTimeout(() => { workflowRunsRerunBtn.disabled = false; workflowRunsRerunBtn.textContent = '↩ Rerun'; }, 2000);
+        return;
+    }
+    workflowRunsRerunBtn.textContent = 'Waiting…';
+});
+
+window.api.onWorkflowRunAppeared(async ({ owner, repo, runId }) => {
+    // add to Runs section in background (don't await — let it register while we refresh level 3)
+    const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
+    window.api.startWatching({ url: runUrl, repeatTotal: 1, source: 'manual' }).then(r => {
+        if (r.started) {
+            if (r.status === 'completed') {
+                addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion], 'manual');
+                applyCompletedState(r.runId, { repeatTotal: 1, failed: r.failed, failedTests: r.failedTests });
+            } else {
+                addRunCard(r.runId, r.name, r.status, null, r.url, 1, 1, [], 'manual');
+            }
+        }
+    });
+
+    if (currentView !== 'workflow-runs' || !currentWorkflow || !currentPRContext) return;
+    await openWorkflowRuns(currentWorkflow, currentPRContext);
+    workflowRunsRerunBtn.disabled = false;
+    workflowRunsRerunBtn.textContent = '↩ Rerun';
 });
 
 addBtn.addEventListener('click', () => {

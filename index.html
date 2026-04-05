@@ -770,6 +770,28 @@
             color: #888;
         }
 
+        .workflow-rerun-btn {
+            padding: 4px 10px;
+            border: 1px solid #533483;
+            border-radius: 6px;
+            background: none;
+            color: #a78bfa;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        .workflow-rerun-btn:hover {
+            background: rgba(83, 52, 131, 0.2);
+            border-color: #a78bfa;
+            color: #c4b5fd;
+        }
+
+        .workflow-rerun-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .workflow-report-btn {
             padding: 4px 10px;
             border: 1px solid #533483;
@@ -892,6 +914,7 @@
             <div class="my-prs-nav pr-detail-nav" id="workflowRunsNav" style="display:none;">
                 <button class="back-btn" id="workflowRunsBack">←</button>
                 <span class="pr-detail-title" id="workflowRunsTitle" style="flex:1;"></span>
+                <button class="workflow-rerun-btn" id="workflowRunsRerunBtn" style="-webkit-app-region:no-drag;">↩ Rerun</button>
                 <button class="workflow-report-btn" id="workflowRunsReportBtn" style="-webkit-app-region:no-drag;">Report</button>
             </div>
         </div>

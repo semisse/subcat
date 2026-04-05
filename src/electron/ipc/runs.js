@@ -13,8 +13,8 @@ function register({ db, poller, storage, getWindow, getUser }) {
         return runs.fetchPRRunsHandler(url, { getToken });
     });
 
-    ipcMain.handle('fetch-workflow-pr-runs', async (event, opts) => {
-        return runs.fetchWorkflowPRRunsHandler(opts, { getToken });
+    ipcMain.handle('fetch-run-attempts', async (event, opts) => {
+        return runs.fetchRunAttemptsHandler(opts, { getToken });
     });
 
     ipcMain.handle('start-watching', async (event, opts) => {
@@ -52,6 +52,11 @@ function register({ db, poller, storage, getWindow, getUser }) {
 
     ipcMain.handle('rerun-run-direct', async (event, { owner, repo, runId }) => {
         return runs.rerunRunDirect(owner, repo, runId, { getToken });
+    });
+
+    ipcMain.handle('watch-workflow-rerun', async (event, { owner, repo, runId, previousAttemptCount }) => {
+        const sendToWindow = (channel, data) => getWindow().webContents.send(channel, data);
+        return runs.watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, sendToWindow });
     });
 }
 
