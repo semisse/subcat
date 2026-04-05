@@ -16,10 +16,20 @@ function register({ db, getWindow }) {
 
         const passed = report.rows.filter(r => r.conclusion === 'success').length;
         const failed = report.rows.length - passed;
+        const total = report.rows.length;
+        let flakinessSummary;
+        if (failed === 0) {
+            flakinessSummary = 'Stable';
+        } else if (failed < total / 2) {
+            flakinessSummary = `Probably flaky — ${failed} failure${failed > 1 ? 's' : ''} in ${total} runs`;
+        } else {
+            flakinessSummary = `Flaky — failed ${failed}/${total} runs`;
+        }
         const lines = [
             `# ${report.name}`,
             '',
-            `**Runs:** ${report.rows.length} · **Passed:** ${passed} · **Failed:** ${failed}`,
+            `**Result:** ${flakinessSummary}`,
+            `**Runs:** ${total} · **Passed:** ${passed} · **Failed:** ${failed}`,
             '',
             '| Run # | Result | Started At | Completed At | Failed Tests |',
             '|-------|--------|------------|--------------|--------------|',

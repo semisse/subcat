@@ -11,6 +11,9 @@ const workflowRunsTitle = document.getElementById('workflowRunsTitle');
 const workflowRunsList = document.getElementById('workflowRunsList');
 const workflowRunsReportBtn = document.getElementById('workflowRunsReportBtn');
 const workflowRunsRerunBtn = document.getElementById('workflowRunsRerunBtn');
+const workflowRepeatInput = document.getElementById('workflowRepeatInput');
+
+const pendingRepeatTotals = new Map(); // runId → repeatTotal
 
 const addBtn = document.getElementById('addBtn');
 const urlForm = document.getElementById('urlForm');
@@ -25,6 +28,8 @@ const sectionWorkflows = document.getElementById('sectionWorkflows');
 const sectionMyPrsItems = document.getElementById('sectionMyPrsItems');
 const sectionRunsItems = document.getElementById('sectionRunsItems');
 const sectionWorkflowsItems = document.getElementById('sectionWorkflowsItems');
+const sectionPinned = document.getElementById('sectionPinned');
+const sectionPinnedItems = document.getElementById('sectionPinnedItems');
 const emptyState = document.getElementById('emptyState');
 const loadingState = document.getElementById('loadingState');
 const errorContainer = document.getElementById('errorContainer');
@@ -59,7 +64,7 @@ refreshBtn.addEventListener('click', async () => {
     refreshBtn.addEventListener('animationend', () => refreshBtn.classList.remove('spinning'), { once: true });
 
     if (currentView === 'workflow-runs' && currentWorkflow && currentPRContext) {
-        await openWorkflowRuns(currentWorkflow, currentPRContext);
+        await openWorkflowRuns(currentWorkflow, currentPRContext, workflowRunsBackTarget);
         return;
     }
 
@@ -74,10 +79,13 @@ refreshBtn.addEventListener('click', async () => {
     runsList.style.display = 'none';
     emptyState.style.display = 'none';
     loadingState.classList.add('visible');
+    sectionPinnedItems.innerHTML = '';
     sectionMyPrsItems.innerHTML = '';
     sectionRunsItems.innerHTML = '';
     sectionWorkflowsItems.innerHTML = '';
     updateSectionVisibility();
+    myPrsList.innerHTML = '';
+    loadUserPRs();
 
     await Promise.all([
         window.api.refreshRuns(),
@@ -91,7 +99,7 @@ refreshBtn.addEventListener('click', async () => {
     loadingState.addEventListener('animationend', () => {
         loadingState.classList.remove('visible', 'hiding');
         runsList.style.display = '';
-        if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+        if (!hasAnyItems()) emptyState.style.display = 'flex';
         updateSectionVisibility();
     }, { once: true });
 });
@@ -147,9 +155,14 @@ function aggregatePRStatus(runs) {
 }
 
 function updateSectionVisibility() {
+    sectionPinned.style.display = sectionPinnedItems.children.length > 0 ? '' : 'none';
     sectionMyPrs.style.display = sectionMyPrsItems.children.length > 0 ? '' : 'none';
     sectionRuns.style.display = sectionRunsItems.children.length > 0 ? '' : 'none';
     sectionWorkflows.style.display = sectionWorkflowsItems.children.length > 0 ? '' : 'none';
+}
+
+function hasAnyItems() {
+    return watchedRuns.size > 0 || sectionPinnedItems.children.length > 0;
 }
 
 function getSectionItems(source) {
@@ -162,12 +175,14 @@ function showMainView() {
     currentView = 'main';
     myPrsList.style.display = '';
     prDetailList.style.display = 'none';
+    workflowRunsList.style.display = 'none';
     prDetailNav.style.display = 'none';
+    workflowRunsNav.style.display = 'none';
     myPrsNav.style.display = 'flex';
     prDetailList.innerHTML = '';
     prDetailTitle.textContent = '';
     runsList.style.display = '';
-    emptyState.style.display = watchedRuns.size === 0 ? 'flex' : 'none';
+    emptyState.style.display = !hasAnyItems() ? 'flex' : 'none';
     document.querySelector('.input-section').style.display = '';
 }
 
@@ -202,6 +217,7 @@ let currentPR = null;
 let currentPRContext = null;
 let currentWorkflow = null;
 let currentWorkflowRuns = null;
+let workflowRunsBackTarget = 'pr-detail'; // 'pr-detail' | 'main'
 
 async function openPRDetail(pr) {
     currentPR = pr;
@@ -223,6 +239,7 @@ async function openPRDetail(pr) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
         const item = document.createElement('div');
         item.className = 'pr-detail-run drillable';
+        item.dataset.runId = run.runId;
         item.innerHTML = `
             <span class="status-dot ${escapeHtml(dotClass)}"></span>
             <span class="pr-detail-run-name">${escapeHtml(run.name)}</span>
@@ -241,8 +258,10 @@ async function openPRDetail(pr) {
     }
 }
 
-async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
+async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTarget = 'pr-detail') {
     currentWorkflow = workflow;
+    workflowRunsBackTarget = backTarget;
+    currentPRContext = { owner, repo, headRef: headRef ?? null };
     showWorkflowRunsView();
     workflowRunsTitle.textContent = workflow.name;
     workflowRunsList.innerHTML = '<div class="pr-detail-loading">Loading runs…</div>';
@@ -258,6 +277,8 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
     currentWorkflowRuns = result.runs;
     const hasActiveRun = result.runs.some(r => r.status !== 'completed');
     workflowRunsRerunBtn.style.display = hasActiveRun ? 'none' : '';
+    workflowRepeatInput.parentElement.style.display = hasActiveRun ? 'none' : '';
+    workflowRepeatInput.value = '1';
 
     for (const [i, run] of result.runs.entries()) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
@@ -279,7 +300,8 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef }) {
 
 prDetailBack.addEventListener('click', showMainView);
 workflowRunsBack.addEventListener('click', () => {
-    if (currentPR) openPRDetail(currentPR);
+    if (workflowRunsBackTarget === 'main') showMainView();
+    else if (currentPR) openPRDetail(currentPR);
     else showPRDetailView();
 });
 workflowRunsReportBtn.addEventListener('click', () => {
@@ -290,12 +312,14 @@ workflowRunsReportBtn.addEventListener('click', () => {
 
 workflowRunsRerunBtn.addEventListener('click', async () => {
     if (!currentWorkflowRuns?.length || !currentPRContext || !currentWorkflow) return;
+    const repeatTotal = parseInt(workflowRepeatInput.value, 10) || 1;
+    const runId = currentWorkflowRuns[0].runId;
     workflowRunsRerunBtn.disabled = true;
     workflowRunsRerunBtn.textContent = 'Starting…';
     const r = await window.api.watchWorkflowRerun({
         owner: currentPRContext.owner,
         repo: currentPRContext.repo,
-        runId: currentWorkflowRuns[0].runId,
+        runId,
         previousAttemptCount: currentWorkflowRuns.length,
     });
     if (r.error) {
@@ -303,25 +327,28 @@ workflowRunsRerunBtn.addEventListener('click', async () => {
         setTimeout(() => { workflowRunsRerunBtn.disabled = false; workflowRunsRerunBtn.textContent = '↩ Rerun'; }, 2000);
         return;
     }
+    pendingRepeatTotals.set(runId, repeatTotal);
     workflowRunsRerunBtn.textContent = 'Waiting…';
 });
 
 window.api.onWorkflowRunAppeared(async ({ owner, repo, runId }) => {
     // add to Runs section in background (don't await — let it register while we refresh level 3)
     const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
-    window.api.startWatching({ url: runUrl, repeatTotal: 1, source: 'manual' }).then(r => {
+    const repeatTotal = pendingRepeatTotals.get(runId) ?? 1;
+    pendingRepeatTotals.delete(runId);
+    window.api.startWatching({ url: runUrl, repeatTotal, source: 'manual' }).then(r => {
         if (r.started) {
             if (r.status === 'completed') {
-                addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion], 'manual');
-                applyCompletedState(r.runId, { repeatTotal: 1, failed: r.failed, failedTests: r.failedTests });
+                addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, repeatTotal, 1, [r.conclusion], 'manual');
+                applyCompletedState(r.runId, { repeatTotal, failed: r.failed, failedTests: r.failedTests });
             } else {
-                addRunCard(r.runId, r.name, r.status, null, r.url, 1, 1, [], 'manual');
+                addRunCard(r.runId, r.name, r.status, null, r.url, repeatTotal, 1, [], 'manual');
             }
         }
     });
 
     if (currentView !== 'workflow-runs' || !currentWorkflow || !currentPRContext) return;
-    await openWorkflowRuns(currentWorkflow, currentPRContext);
+    await openWorkflowRuns(currentWorkflow, currentPRContext, workflowRunsBackTarget);
     workflowRunsRerunBtn.disabled = false;
     workflowRunsRerunBtn.textContent = '↩ Rerun';
 });
@@ -341,6 +368,7 @@ function resetForm() {
     urlInput.value = '';
     repeatInput.value = '1';
     repeatInput.disabled = false;
+    repeatInput.parentElement.style.display = '';
     urlForm.style.display = 'none';
     addBtn.style.display = 'block';
     prPicker.innerHTML = '';
@@ -355,11 +383,38 @@ function isPRUrl(url) {
     return /github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(url);
 }
 
+function parseGitHubRunUrl(url) {
+    const m = url.match(/github\.com\/([^/]+)\/([^/]+)\/actions\/runs\/(\d+)/);
+    if (!m) return null;
+    return { owner: m[1], repo: m[2], runId: m[3] };
+}
+
+function isWorkflowUrl(url) {
+    return /github\.com\/[^/]+\/[^/]+\/actions\/workflows\/[^/?#]+/.test(url);
+}
+
 watchBtn.addEventListener('click', async () => {
     const url = urlInput.value.trim();
     if (!url) return;
 
     errorContainer.innerHTML = '';
+
+    if (isWorkflowUrl(url)) {
+        watchBtn.disabled = true;
+        watchBtn.textContent = 'Pinning…';
+        const result = await window.api.pinWorkflow(url);
+        watchBtn.disabled = false;
+        watchBtn.textContent = 'Pin';
+        if (result.error) {
+            errorContainer.innerHTML = `<div class="error-msg">${escapeHtml(result.error)}</div>`;
+            return;
+        }
+        if (result.pinned) {
+            addPinnedWorkflowCard(result.id, result.name, result.url, result.latestRunStatus, result.latestRunConclusion, result.latestRunUrl);
+            resetForm();
+        }
+        return;
+    }
 
     if (isPRUrl(url) && !selectedRunUrl) {
         watchBtn.disabled = true;
@@ -447,11 +502,19 @@ urlInput.addEventListener('keydown', (e) => {
 });
 
 urlInput.addEventListener('input', () => {
-    if (selectedRunUrl) {
+    const url = urlInput.value.trim();
+    const workflow = isWorkflowUrl(url);
+    repeatInput.parentElement.style.display = workflow ? 'none' : '';
+    if (workflow) {
+        watchBtn.textContent = 'Pin';
+        watchBtn.disabled = false;
+    } else if (!selectedRunUrl) {
+        watchBtn.textContent = 'Watch';
+    }
+    if (selectedRunUrl && !workflow) {
         selectedRunUrl = null;
         prPicker.innerHTML = '';
         prPicker.style.display = 'none';
-        watchBtn.textContent = 'Watch';
         watchBtn.disabled = false;
         repeatInput.disabled = false;
     }
@@ -470,6 +533,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
     const failed = results.filter(r => r !== 'success').length;
     const resultsStr = repeatTotal > 1 && results.length > 0 ? ` · <span class="count-pass">${passed}</span> <span class="count-fail">${failed}</span>` : '';
     const repeatLabel = repeatTotal > 1 ? `Run ${repeatCurrent}/${repeatTotal}${resultsStr}` : '';
+    const summary = (status === 'completed' && repeatTotal > 1) ? flakinessSummary(results, repeatTotal) : null;
 
     const card = document.createElement('div');
     card.className = `run-card ${getCardClass(status, conclusion)}`;
@@ -489,7 +553,16 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
             <span class="status-text">${formatStatus(status, conclusion)}</span>
             ${repeatTotal > 1 ? `<span class="run-repeat">${repeatLabel}</span>` : ''}
         </div>
+        ${summary ? `<div class="run-flakiness ${summary.cls}">${escapeHtml(summary.label)}</div>` : ''}
     `;
+
+    card.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const parsed = parseGitHubRunUrl(url);
+        if (!parsed) return;
+        openWorkflowRuns({ runId: parsed.runId, name }, { owner: parsed.owner, repo: parsed.repo }, 'main');
+    });
+    card.style.cursor = 'pointer';
 
     card.querySelector('.open-btn').addEventListener('click', () => window.api.openExternal(url));
     card.querySelector('.cancel-run-btn')?.addEventListener('click', async (e) => {
@@ -499,7 +572,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
         await window.api.cancelRun(runId);
         card.remove();
         watchedRuns.delete(runId);
-        if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+        if (!hasAnyItems()) emptyState.style.display = 'flex';
         updateSectionVisibility();
     });
     card.querySelector('.remove-btn').addEventListener('click', async () => {
@@ -513,7 +586,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
         await window.api.stopWatching(runId);
         card.remove();
         watchedRuns.delete(runId);
-        if (watchedRuns.size === 0) emptyState.style.display = 'flex';
+        if (!hasAnyItems()) emptyState.style.display = 'flex';
         updateSectionVisibility();
     });
 
@@ -549,6 +622,14 @@ const STATUS_LABELS = {
 function formatStatus(status, conclusion) {
     const key = status === 'completed' ? conclusion : status;
     return STATUS_LABELS[key] ?? (key ?? '').replace(/_/g, ' ');
+}
+
+function flakinessSummary(results, repeatTotal) {
+    if (results.length < repeatTotal) return null;
+    const failed = results.filter(r => r !== 'success').length;
+    if (failed === 0) return { label: 'Stable', cls: 'flakiness-stable' };
+    if (failed < repeatTotal / 2) return { label: `Probably flaky — ${failed} failure${failed > 1 ? 's' : ''} in ${repeatTotal} runs`, cls: 'flakiness-warn' };
+    return { label: `Flaky — failed ${failed}/${repeatTotal} runs`, cls: 'flakiness-bad' };
 }
 
 function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTotal, results = []) {
@@ -595,6 +676,19 @@ function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTot
         const failed = results.filter(r => r !== 'success').length;
         const resultsStr = results.length > 0 ? ` · <span class="count-pass">${passed}</span> <span class="count-fail">${failed}</span>` : '';
         repeatEl.innerHTML = `Run ${repeatCurrent}/${repeatTotal}${resultsStr}`;
+
+        if (status === 'completed' && repeatCurrent === repeatTotal) {
+            const summary = flakinessSummary(results, repeatTotal);
+            if (summary) {
+                let flakinessEl = card.querySelector('.run-flakiness');
+                if (!flakinessEl) {
+                    flakinessEl = document.createElement('div');
+                    card.appendChild(flakinessEl);
+                }
+                flakinessEl.className = `run-flakiness ${summary.cls}`;
+                flakinessEl.textContent = summary.label;
+            }
+        }
     }
 }
 
@@ -602,6 +696,15 @@ function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTot
 window.api.onRunUpdate((data) => {
     updateRunCard(data.runId, data.status, data.conclusion, data.name, data.repeatCurrent, data.repeatTotal, data.results);
     watchedRuns.set(data.runId, data);
+
+    if (currentView === 'pr-detail') {
+        const row = prDetailList.querySelector(`[data-run-id="${data.runId}"]`);
+        if (row) {
+            const dotClass = data.status === 'completed' ? (data.conclusion ?? '') : data.status;
+            row.querySelector('.status-dot').className = `status-dot ${dotClass}`;
+            row.querySelector('.pr-detail-run-status').textContent = formatStatus(data.status, data.conclusion);
+        }
+    }
 });
 
 window.api.onRunError((data) => {
@@ -712,4 +815,78 @@ function applyCompletedState(runId, { failed, failedTests }) {
 
 window.api.onRunReportReady((data) => {
     applyCompletedState(data.runId, data);
+});
+
+function addPinnedWorkflowCard(id, name, workflowUrl, latestRunStatus, latestRunConclusion, latestRunUrl) {
+    emptyState.style.display = 'none';
+
+    const dotClass = latestRunStatus === 'completed' ? (latestRunConclusion ?? '') : (latestRunStatus ?? '');
+    const statusText = latestRunStatus ? formatStatus(latestRunStatus, latestRunConclusion) : 'No runs yet';
+    const cardClass = latestRunStatus === 'completed'
+        ? (latestRunConclusion === 'success' ? 'completed-success' : 'completed-failure')
+        : (latestRunStatus ? 'in-progress' : '');
+
+    const card = document.createElement('div');
+    card.className = `run-card pinned-card ${cardClass}`;
+    card.id = `pinned-${id}`;
+    card.innerHTML = `
+        <div class="run-card-header">
+            <div class="run-name" title="${escapeHtml(name)}">📌 ${escapeHtml(name)}</div>
+            <div class="run-actions">
+                ${latestRunUrl ? '<button class="open-btn">Open</button>' : ''}
+                <button class="remove-btn" title="Unpin">×</button>
+            </div>
+        </div>
+        <div class="run-status">
+            <span class="status-dot ${escapeHtml(dotClass)}"></span>
+            <span class="status-text">${escapeHtml(statusText)}</span>
+        </div>
+    `;
+
+    if (latestRunUrl) {
+        card.querySelector('.open-btn').addEventListener('click', () => window.api.openExternal(latestRunUrl));
+    }
+    card.querySelector('.remove-btn').addEventListener('click', async () => {
+        await window.api.unpinWorkflow(id);
+        card.remove();
+        if (!hasAnyItems()) emptyState.style.display = 'flex';
+        updateSectionVisibility();
+    });
+
+    sectionPinnedItems.prepend(card);
+    updateSectionVisibility();
+}
+
+function updatePinnedWorkflowCard(id, latestRunStatus, latestRunConclusion, latestRunUrl) {
+    const card = document.getElementById(`pinned-${id}`);
+    if (!card) return;
+
+    const cardClass = latestRunStatus === 'completed'
+        ? (latestRunConclusion === 'success' ? 'completed-success' : 'completed-failure')
+        : (latestRunStatus ? 'in-progress' : '');
+    card.className = `run-card pinned-card ${cardClass}`;
+
+    const dotClass = latestRunStatus === 'completed' ? (latestRunConclusion ?? '') : (latestRunStatus ?? '');
+    card.querySelector('.status-dot').className = `status-dot ${dotClass}`;
+    card.querySelector('.status-text').textContent = latestRunStatus ? formatStatus(latestRunStatus, latestRunConclusion) : 'No runs yet';
+
+    if (latestRunUrl) {
+        const actions = card.querySelector('.run-actions');
+        let openBtn = actions.querySelector('.open-btn');
+        if (!openBtn) {
+            openBtn = document.createElement('button');
+            openBtn.className = 'open-btn';
+            openBtn.textContent = 'Open';
+            actions.insertBefore(openBtn, actions.querySelector('.remove-btn'));
+        }
+        openBtn.onclick = () => window.api.openExternal(latestRunUrl);
+    }
+}
+
+window.api.onPinnedWorkflowUpdate((data) => {
+    updatePinnedWorkflowCard(data.id, data.latestRunStatus, data.latestRunConclusion, data.latestRunUrl);
+});
+
+window.api.onPinnedWorkflowRestored((data) => {
+    addPinnedWorkflowCard(data.id, data.name, data.url, data.latestRunStatus, data.latestRunConclusion, data.latestRunUrl);
 });

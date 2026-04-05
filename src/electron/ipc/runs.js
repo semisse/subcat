@@ -4,6 +4,10 @@ const runs = require('../../core/runs');
 function register({ db, poller, storage, getWindow, getUser }) {
     const getToken = () => storage.loadToken() || undefined;
 
+    poller.on('run:new-attempt', ({ owner, repo, runId }) => {
+        getWindow()?.webContents.send('workflow-run-appeared', { owner, repo, runId });
+    });
+
     ipcMain.handle('fetch-user-prs', async () => {
         const user = getUser();
         return runs.fetchUserPRsHandler(user?.login, { getToken });
@@ -55,8 +59,19 @@ function register({ db, poller, storage, getWindow, getUser }) {
     });
 
     ipcMain.handle('watch-workflow-rerun', async (event, { owner, repo, runId, previousAttemptCount }) => {
-        const sendToWindow = (channel, data) => getWindow().webContents.send(channel, data);
-        return runs.watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, sendToWindow });
+        return runs.watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, poller });
+    });
+
+    ipcMain.handle('pin-workflow', async (event, url) => {
+        return runs.pinWorkflow({ url }, {
+            db,
+            getToken,
+            onUpdate: (data) => getWindow()?.webContents.send('pinned-workflow-update', data),
+        });
+    });
+
+    ipcMain.handle('unpin-workflow', async (event, id) => {
+        return runs.unpinWorkflow(id, { db });
     });
 }
 

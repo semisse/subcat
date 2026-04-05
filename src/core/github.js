@@ -8,6 +8,24 @@ function parseGitHubUrl(url) {
     return { owner: match[1], repo: match[2], runId: match[3] };
 }
 
+function parseWorkflowUrl(url) {
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/actions\/workflows\/([^/?#]+)/);
+    if (!match) return null;
+    return { owner: match[1], repo: match[2], workflowFile: match[3] };
+}
+
+function fetchWorkflowInfo(owner, repo, workflowFile, token) {
+    return githubGet(`/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(workflowFile)}`, token);
+}
+
+async function fetchLatestWorkflowRun(owner, repo, workflowFile, token) {
+    const { workflow_runs } = await githubGet(
+        `/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?per_page=1`,
+        token
+    );
+    return workflow_runs[0] ?? null;
+}
+
 function parsePRUrl(url) {
     const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
     if (!match) return null;
@@ -202,4 +220,4 @@ function rerunFailedJobs(owner, repo, runId, token) {
     });
 }
 
-module.exports = { delay, parseGitHubUrl, parsePRUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };
+module.exports = { delay, parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, fetchWorkflowInfo, fetchLatestWorkflowRun, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

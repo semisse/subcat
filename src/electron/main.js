@@ -80,12 +80,9 @@ app.whenReady().then(async () => {
             currentUser = await auth.fetchUser(token);
             createMainWindow();
             mainWindow.webContents.on('did-finish-load', () => {
-                runs.resumeRuns({
-                    db,
-                    poller,
-                    getToken,
-                    sendToWindow: (ch, data) => mainWindow?.webContents.send(ch, data),
-                });
+                const sendToWindow = (ch, data) => mainWindow?.webContents.send(ch, data);
+                runs.resumeRuns({ db, poller, getToken, sendToWindow });
+                runs.resumePinnedWorkflows({ db, getToken, sendToWindow });
             });
         } catch {
             storage.clearToken();
@@ -140,10 +137,7 @@ ipcMain.handle('get-version', () => app.getVersion());
 ipcMain.handle('show-about', () => app.showAboutPanel());
 
 ipcMain.handle('refresh-runs', () => {
-    runs.resumeRuns({
-        db,
-        poller,
-        getToken,
-        sendToWindow: (ch, data) => mainWindow?.webContents.send(ch, data),
-    });
+    const sendToWindow = (ch, data) => mainWindow?.webContents.send(ch, data);
+    runs.resumeRuns({ db, poller, getToken, sendToWindow });
+    runs.resumePinnedWorkflows({ db, getToken, sendToWindow });
 });

@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('api', {
     rerunRunDirect: (opts) => ipcRenderer.invoke('rerun-run-direct', opts),
     watchWorkflowRerun: (opts) => ipcRenderer.invoke('watch-workflow-rerun', opts),
     onWorkflowRunAppeared: (callback) => ipcRenderer.on('workflow-run-appeared', (_, data) => callback(data)),
+    pinWorkflow: (url) => ipcRenderer.invoke('pin-workflow', url),
+    unpinWorkflow: (id) => ipcRenderer.invoke('unpin-workflow', id),
+    onPinnedWorkflowUpdate: (callback) => ipcRenderer.on('pinned-workflow-update', (_, data) => callback(data)),
+    onPinnedWorkflowRestored: (callback) => ipcRenderer.on('pinned-workflow-restored', (_, data) => callback(data)),
 
     getVersion: () => ipcRenderer.invoke('get-version'),
     showAbout: () => ipcRenderer.invoke('show-about'),

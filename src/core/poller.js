@@ -1,5 +1,5 @@
 const { EventEmitter } = require('events');
-const { fetchRunStatus, fetchFailedTests, rerunWorkflow, delay } = require('./github');
+const { fetchRunStatus, fetchFailedTests, rerunWorkflow, delay, githubGet } = require('./github');
 
 const POLL_INTERVAL_MS = 15_000;
 const TRANSIENT_ERRORS = new Set(['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED']);
@@ -37,6 +37,28 @@ class PollManager extends EventEmitter {
 
     isActive(runId) {
         return this.#active.has(runId);
+    }
+
+    watchAttempt({ owner, repo, runId, previousAttemptCount }, getToken) {
+        const key = `attempt:${runId}`;
+        if (this.#active.has(key)) return;
+        this.#active.add(key);
+        (async () => {
+            while (this.#active.has(key)) {
+                await delay(POLL_INTERVAL_MS);
+                if (!this.#active.has(key)) break;
+                try {
+                    const run = await githubGet(`/repos/${owner}/${repo}/actions/runs/${runId}`, getToken());
+                    if (run.run_attempt > previousAttemptCount) {
+                        this.#active.delete(key);
+                        this.emit('run:new-attempt', { owner, repo, runId });
+                        break;
+                    }
+                } catch (err) {
+                    if (!isTransient(err)) { this.#active.delete(key); break; }
+                }
+            }
+        })();
     }
 
     async #loop({ runId, currentRunId, owner, repo, runNumber, repeatTotal }, results, reportRows, getToken) {

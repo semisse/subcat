@@ -792,6 +792,38 @@
             cursor: not-allowed;
         }
 
+        .wf-repeat-field {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 0 6px;
+            background: #16213e;
+        }
+
+        .wf-repeat-field .repeat-label {
+            color: #555;
+            font-size: 11px;
+        }
+
+        .wf-repeat-field input[type="number"] {
+            width: 32px;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 11px;
+            padding: 4px 0;
+            margin: 0;
+            text-align: center;
+            -moz-appearance: textfield;
+        }
+
+        .wf-repeat-field input[type="number"]::-webkit-outer-spin-button,
+        .wf-repeat-field input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+        }
+
         .workflow-report-btn {
             padding: 4px 10px;
             border: 1px solid #533483;
@@ -885,6 +917,25 @@
             color: #e74c3c;
             margin-top: 10px;
         }
+
+        .run-flakiness {
+            font-size: 11px;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        .run-flakiness.flakiness-stable { color: #2ecc71; }
+        .run-flakiness.flakiness-warn   { color: #f39c12; }
+        .run-flakiness.flakiness-bad    { color: #e74c3c; }
+
+        .run-card.pinned-card {
+            border-color: #2a3a5e;
+        }
+
+        .pinned-meta {
+            font-size: 11px;
+            color: #555;
+            margin-left: 4px;
+        }
     </style>
 </head>
 <body>
@@ -914,6 +965,10 @@
             <div class="my-prs-nav pr-detail-nav" id="workflowRunsNav" style="display:none;">
                 <button class="back-btn" id="workflowRunsBack">←</button>
                 <span class="pr-detail-title" id="workflowRunsTitle" style="flex:1;"></span>
+                <div class="wf-repeat-field" id="workflowRepeatField" style="-webkit-app-region:no-drag;">
+                    <span class="repeat-label">×</span>
+                    <input type="number" id="workflowRepeatInput" value="1" min="1" max="100" title="Number of reruns">
+                </div>
                 <button class="workflow-rerun-btn" id="workflowRunsRerunBtn" style="-webkit-app-region:no-drag;">↩ Rerun</button>
                 <button class="workflow-report-btn" id="workflowRunsReportBtn" style="-webkit-app-region:no-drag;">Report</button>
             </div>
@@ -925,6 +980,10 @@
     </div>
 
     <div class="runs-list" id="runsList">
+        <div class="runs-section" id="sectionPinned" style="display:none;">
+            <div class="runs-section-label">Pinned</div>
+            <div id="sectionPinnedItems"></div>
+        </div>
         <div class="runs-section" id="sectionMyPrs" style="display:none;">
             <div class="runs-section-label">My PRs</div>
             <div id="sectionMyPrsItems"></div>
@@ -951,7 +1010,7 @@
         <button class="add-btn" id="addBtn">+ Watch</button>
 
         <div class="url-form" id="urlForm" style="display:none;">
-            <input type="text" id="urlInput" placeholder="GitHub Actions run or PR URL" autofocus>
+            <input type="text" id="urlInput" placeholder="GitHub run, PR, or workflow URL" autofocus>
             <div id="prPicker" class="pr-picker" style="display:none;"></div>
             <div class="url-form-actions">
                 <div class="repeat-field">

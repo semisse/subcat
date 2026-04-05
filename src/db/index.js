@@ -43,6 +43,22 @@ function migrate(db) {
         );
     `);
 
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS pinned_workflows (
+            id TEXT PRIMARY KEY,
+            owner TEXT NOT NULL,
+            repo TEXT NOT NULL,
+            workflow_file TEXT NOT NULL,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            latest_run_id TEXT,
+            latest_run_status TEXT,
+            latest_run_conclusion TEXT,
+            latest_run_url TEXT,
+            created_at TEXT NOT NULL
+        );
+    `);
+
     try {
         db.exec(`ALTER TABLE runs ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`);
     } catch (_) { /* column already exists */ }
@@ -107,4 +123,36 @@ function getReport(runId) {
     return { name: run.name, rows };
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport };
+function addPinnedWorkflow({ id, owner, repo, workflowFile, name, url, latestRunId, latestRunStatus, latestRunConclusion, latestRunUrl }) {
+    getDb().prepare(`
+        INSERT INTO pinned_workflows (id, owner, repo, workflow_file, name, url, latest_run_id, latest_run_status, latest_run_conclusion, latest_run_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, owner, repo, workflowFile, name, url, latestRunId ?? null, latestRunStatus ?? null, latestRunConclusion ?? null, latestRunUrl ?? null, new Date().toISOString());
+}
+
+function updatePinnedWorkflow(id, { name, latestRunId, latestRunStatus, latestRunConclusion, latestRunUrl } = {}) {
+    const fields = [];
+    const values = [];
+    if (name !== undefined)                { fields.push('name = ?');                  values.push(name); }
+    if (latestRunId !== undefined)         { fields.push('latest_run_id = ?');         values.push(latestRunId); }
+    if (latestRunStatus !== undefined)     { fields.push('latest_run_status = ?');     values.push(latestRunStatus); }
+    if (latestRunConclusion !== undefined) { fields.push('latest_run_conclusion = ?'); values.push(latestRunConclusion); }
+    if (latestRunUrl !== undefined)        { fields.push('latest_run_url = ?');        values.push(latestRunUrl); }
+    if (!fields.length) return;
+    values.push(id);
+    getDb().prepare(`UPDATE pinned_workflows SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+function getPinnedWorkflow(id) {
+    return getDb().prepare(`SELECT * FROM pinned_workflows WHERE id = ?`).get(id) ?? null;
+}
+
+function getAllPinnedWorkflows() {
+    return getDb().prepare(`SELECT * FROM pinned_workflows ORDER BY created_at DESC`).all();
+}
+
+function removePinnedWorkflow(id) {
+    getDb().prepare(`DELETE FROM pinned_workflows WHERE id = ?`).run(id);
+}
+
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow };

@@ -1,8 +1,12 @@
 const {
-    parseGitHubUrl, parsePRUrl,
+    parseGitHubUrl, parsePRUrl, parseWorkflowUrl,
     fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests,
+    fetchWorkflowInfo, fetchLatestWorkflowRun,
     rerunWorkflow, rerunFailedJobs, cancelRun,
 } = require('./github');
+
+const PINNED_POLL_INTERVAL_MS = 30_000;
+const pinnedPollers = new Map();
 
 async function startWatching({ url, repeatTotal = 1, source = 'manual' }, { db, poller, getToken }) {
     const parsed = parseGitHubUrl(url);
@@ -242,29 +246,105 @@ async function rerunRunDirect(owner, repo, runId, { getToken }) {
     }
 }
 
-async function watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, sendToWindow }) {
+async function watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, poller }) {
     try {
         await rerunWorkflow(owner, repo, runId, getToken());
     } catch (err) {
         return { error: err.message };
     }
-
-    // poll run until run_attempt increases
-    (async () => {
-        const deadline = Date.now() + 30000;
-        while (Date.now() < deadline) {
-            await new Promise(res => setTimeout(res, 2000));
-            try {
-                const { totalAttempts } = await fetchRunAttempts(owner, repo, runId, getToken());
-                if (totalAttempts > previousAttemptCount) {
-                    sendToWindow('workflow-run-appeared', { owner, repo, runId });
-                    break;
-                }
-            } catch {}
-        }
-    })();
-
+    poller.watchAttempt({ owner, repo, runId, previousAttemptCount }, getToken);
     return { started: true };
+}
+
+async function pinWorkflow({ url }, { db, getToken, onUpdate }) {
+    const parsed = parseWorkflowUrl(url);
+    if (!parsed) {
+        return { error: 'Invalid GitHub workflow URL. Expected: https://github.com/{owner}/{repo}/actions/workflows/{file}' };
+    }
+
+    const { owner, repo, workflowFile } = parsed;
+    const id = `${owner}/${repo}/${workflowFile}`;
+
+    if (db.getPinnedWorkflow(id)) {
+        return { error: 'This workflow is already pinned.' };
+    }
+
+    try {
+        const [workflowInfo, latestRun] = await Promise.all([
+            fetchWorkflowInfo(owner, repo, workflowFile, getToken()),
+            fetchLatestWorkflowRun(owner, repo, workflowFile, getToken()).catch(() => null),
+        ]);
+
+        const name = workflowInfo.name;
+        const latestRunId = latestRun ? String(latestRun.id) : null;
+        const latestRunStatus = latestRun?.status ?? null;
+        const latestRunConclusion = latestRun?.conclusion ?? null;
+        const latestRunUrl = latestRun ? `https://github.com/${owner}/${repo}/actions/runs/${latestRun.id}` : null;
+
+        db.addPinnedWorkflow({ id, owner, repo, workflowFile, name, url, latestRunId, latestRunStatus, latestRunConclusion, latestRunUrl });
+        startPinnedPolling({ id, owner, repo, workflowFile }, { db, getToken, onUpdate });
+
+        return { pinned: true, id, name, url, latestRunId, latestRunStatus, latestRunConclusion, latestRunUrl };
+    } catch (err) {
+        return { error: err.message };
+    }
+}
+
+function unpinWorkflow(id, { db }) {
+    stopPinnedPolling(id);
+    db.removePinnedWorkflow(id);
+    return { unpinned: true };
+}
+
+function startPinnedPolling({ id, owner, repo, workflowFile }, { db, getToken, onUpdate }) {
+    if (pinnedPollers.has(id)) return;
+
+    const intervalId = setInterval(async () => {
+        try {
+            const run = await fetchLatestWorkflowRun(owner, repo, workflowFile, getToken());
+            const stored = db.getPinnedWorkflow(id);
+            if (!stored) { stopPinnedPolling(id); return; }
+
+            const newRunId = run ? String(run.id) : null;
+            const newStatus = run?.status ?? null;
+            const newConclusion = run?.conclusion ?? null;
+            const newUrl = run ? `https://github.com/${owner}/${repo}/actions/runs/${run.id}` : null;
+
+            if (newRunId !== stored.latest_run_id || newStatus !== stored.latest_run_status || newConclusion !== stored.latest_run_conclusion) {
+                db.updatePinnedWorkflow(id, { latestRunId: newRunId, latestRunStatus: newStatus, latestRunConclusion: newConclusion, latestRunUrl: newUrl });
+                onUpdate({ id, latestRunId: newRunId, latestRunStatus: newStatus, latestRunConclusion: newConclusion, latestRunUrl: newUrl });
+            }
+        } catch (_) { /* ignore polling errors */ }
+    }, PINNED_POLL_INTERVAL_MS);
+
+    pinnedPollers.set(id, intervalId);
+}
+
+function stopPinnedPolling(id) {
+    const intervalId = pinnedPollers.get(id);
+    if (intervalId !== undefined) {
+        clearInterval(intervalId);
+        pinnedPollers.delete(id);
+    }
+}
+
+function resumePinnedWorkflows({ db, getToken, sendToWindow }) {
+    const onUpdate = (data) => sendToWindow('pinned-workflow-update', data);
+    for (const pw of db.getAllPinnedWorkflows()) {
+        sendToWindow('pinned-workflow-restored', {
+            id: pw.id,
+            name: pw.name,
+            url: pw.url,
+            latestRunId: pw.latest_run_id,
+            latestRunStatus: pw.latest_run_status,
+            latestRunConclusion: pw.latest_run_conclusion,
+            latestRunUrl: pw.latest_run_url,
+        });
+        startPinnedPolling(
+            { id: pw.id, owner: pw.owner, repo: pw.repo, workflowFile: pw.workflow_file },
+            { db, getToken, onUpdate }
+        );
+    }
 }
 
 module.exports = {
@@ -279,4 +359,7 @@ module.exports = {
     rerunRunDirect,
     watchWorkflowRerun,
     resumeRuns,
+    pinWorkflow,
+    unpinWorkflow,
+    resumePinnedWorkflows,
 };
