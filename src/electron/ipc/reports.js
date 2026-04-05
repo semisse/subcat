@@ -39,7 +39,7 @@ function register({ db, getWindow }) {
                 return `| [${r.number}](${r.url}) | ${emoji} ${r.conclusion} | ${r.started_at ?? '—'} | ${r.completed_at ?? '—'} | ${tests} |`;
             }),
         ];
-        lines.push('', '---', '*Made by [SubCat](https://github.com/semisse/subcat)*');
+        lines.push('', '---', '*Made by [SubCat](https://subcat.todaywedream.com)*');
         fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
 
         return { saved: true };
@@ -81,7 +81,7 @@ function register({ db, getWindow }) {
             }),
             '',
             '---',
-            '*Made by [SubCat](https://github.com/semisse/subcat)*',
+            '*Made by [SubCat](https://subcat.todaywedream.com)*',
         ];
         fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
         return { saved: true };
