@@ -146,6 +146,17 @@ async function loadUserPRs() {
                 const badge = item.querySelector('.pr-ci-badge');
                 if (badge) badge.innerHTML = '<span class="status-dot"></span>';
             });
+
+        window.api.fetchPRReviews({ owner: pr.owner, repo: pr.repo, prNumber: pr.number })
+            .then(r => {
+                if (r.error || r.reviewCount === 0) return;
+                const meta = item.querySelector('.my-pr-meta');
+                if (!meta) return;
+                const label = r.approved ? '✓ approved' : r.changesRequested ? '✗ changes' : `${r.reviewCount} review${r.reviewCount > 1 ? 's' : ''}`;
+                const cls = r.approved ? 'pr-review-approved' : r.changesRequested ? 'pr-review-changes' : 'pr-review-pending';
+                meta.innerHTML += ` · <span class="${cls}">${escapeHtml(label)}</span>`;
+            })
+            .catch(() => {});
     }
 }
 
@@ -173,6 +184,7 @@ function getSectionItems(source) {
 }
 
 function showMainView() {
+    clearLevel3Poll();
     currentView = 'main';
     myPrsList.style.display = '';
     prDetailList.style.display = 'none';
@@ -188,6 +200,7 @@ function showMainView() {
 }
 
 function showPRDetailView() {
+    clearLevel3Poll();
     currentView = 'pr-detail';
     myPrsList.style.display = 'none';
     prDetailList.style.display = 'block';
@@ -219,6 +232,14 @@ let currentPRContext = null;
 let currentWorkflow = null;
 let currentWorkflowRuns = null;
 let workflowRunsBackTarget = 'pr-detail'; // 'pr-detail' | 'main'
+let level3PollInterval = null;
+
+function clearLevel3Poll() {
+    if (level3PollInterval) {
+        clearInterval(level3PollInterval);
+        level3PollInterval = null;
+    }
+}
 
 async function openPRDetail(pr) {
     currentPR = pr;
@@ -260,6 +281,7 @@ async function openPRDetail(pr) {
 }
 
 async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTarget = 'pr-detail') {
+    clearLevel3Poll();
     currentWorkflow = workflow;
     workflowRunsBackTarget = backTarget;
     currentPRContext = { owner, repo, headRef: headRef ?? null };
@@ -297,6 +319,17 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
         `;
         item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
         workflowRunsList.appendChild(item);
+    }
+
+    // Auto-refresh every 15s while there's an active run
+    if (hasActiveRun) {
+        level3PollInterval = setInterval(() => {
+            if (currentView === 'workflow-runs' && currentWorkflow && currentPRContext) {
+                openWorkflowRuns(currentWorkflow, currentPRContext, workflowRunsBackTarget);
+            } else {
+                clearLevel3Poll();
+            }
+        }, 15000);
     }
 }
 

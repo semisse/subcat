@@ -1,7 +1,7 @@
 const {
     parseGitHubUrl, parsePRUrl, parseWorkflowUrl,
     fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests,
-    fetchWorkflowInfo, fetchLatestWorkflowRun,
+    fetchWorkflowInfo, fetchLatestWorkflowRun, fetchPRReviews,
     rerunWorkflow, rerunFailedJobs, cancelRun,
 } = require('./github');
 
@@ -183,6 +183,14 @@ async function fetchRunAttemptsHandler({ owner, repo, runId }, { getToken }) {
     }
 }
 
+async function fetchPRReviewsHandler({ owner, repo, prNumber }, { getToken }) {
+    try {
+        return await fetchPRReviews(owner, repo, prNumber, getToken());
+    } catch (err) {
+        return { error: err.message };
+    }
+}
+
 function resumeRuns({ db, poller, getToken, sendToWindow }) {
     for (const run of db.getAllRuns()) {
         const runResults = db.getRunResults(run.id);
@@ -356,6 +364,7 @@ module.exports = {
     fetchUserPRsHandler,
     fetchPRRunsHandler,
     fetchRunAttemptsHandler,
+    fetchPRReviewsHandler,
     rerunRunDirect,
     watchWorkflowRerun,
     resumeRuns,

@@ -84,6 +84,8 @@ async function fetchRunAttempts(owner, repo, runId, token) {
                     status: r.status,
                     conclusion: r.conclusion,
                     url: `https://github.com/${owner}/${repo}/actions/runs/${runId}/attempts/${r.run_attempt}`,
+                    started_at: r.run_started_at ?? r.created_at ?? null,
+                    completed_at: r.status === 'completed' ? (r.updated_at ?? null) : null,
                 }));
         })
     );
@@ -220,4 +222,19 @@ function rerunFailedJobs(owner, repo, runId, token) {
     });
 }
 
-module.exports = { delay, parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, fetchWorkflowInfo, fetchLatestWorkflowRun, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };
+async function fetchPRReviews(owner, repo, prNumber, token) {
+    const reviews = await githubGet(`/repos/${owner}/${repo}/pulls/${prNumber}/reviews`, token);
+    // Last non-comment state per reviewer wins
+    const stateByUser = {};
+    for (const r of reviews) {
+        if (r.state !== 'COMMENTED') stateByUser[r.user.login] = r.state;
+    }
+    const states = Object.values(stateByUser);
+    return {
+        approved: states.some(s => s === 'APPROVED'),
+        changesRequested: states.some(s => s === 'CHANGES_REQUESTED'),
+        reviewCount: states.length,
+    };
+}
+
+module.exports = { delay, parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, fetchWorkflowInfo, fetchLatestWorkflowRun, fetchPRReviews, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

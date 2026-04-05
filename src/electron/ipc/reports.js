@@ -39,6 +39,7 @@ function register({ db, getWindow }) {
                 return `| [${r.number}](${r.url}) | ${emoji} ${r.conclusion} | ${r.started_at ?? '—'} | ${r.completed_at ?? '—'} | ${tests} |`;
             }),
         ];
+        lines.push('', '---', '*Made by [SubCat](https://github.com/semisse/subcat)*');
         fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
 
         return { saved: true };
@@ -55,19 +56,32 @@ function register({ db, getWindow }) {
 
         const passed = runs.filter(r => r.conclusion === 'success').length;
         const failed = runs.filter(r => r.conclusion && r.conclusion !== 'success').length;
+        function formatDuration(started, completed) {
+            if (!started || !completed) return '—';
+            const ms = new Date(completed) - new Date(started);
+            if (isNaN(ms) || ms < 0) return '—';
+            const s = Math.round(ms / 1000);
+            if (s < 60) return `${s}s`;
+            return `${Math.floor(s / 60)}m ${s % 60}s`;
+        }
+
         const lines = [
             `# ${workflowName}`,
             '',
             `**Runs:** ${runs.length} · **Passed:** ${passed} · **Failed:** ${failed}`,
             '',
-            '| Attempt | Result | Link |',
-            '|---------|--------|------|',
+            '| Attempt | Result | Duration | Link |',
+            '|---------|--------|----------|------|',
             ...runs.map((r, i) => {
                 const emoji = r.conclusion === 'success' ? '✅' : r.conclusion ? '❌' : '🔄';
                 const result = r.conclusion ?? r.status ?? '—';
                 const attempt = runs.length - i;
-                return `| #${attempt} | ${emoji} ${result} | [Open](${r.url}) |`;
+                const duration = formatDuration(r.started_at, r.completed_at);
+                return `| #${attempt} | ${emoji} ${result} | ${duration} | [Open](${r.url}) |`;
             }),
+            '',
+            '---',
+            '*Made by [SubCat](https://github.com/semisse/subcat)*',
         ];
         fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
         return { saved: true };

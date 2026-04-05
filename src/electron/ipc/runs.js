@@ -21,6 +21,10 @@ function register({ db, poller, storage, getWindow, getUser }) {
         return runs.fetchRunAttemptsHandler(opts, { getToken });
     });
 
+    ipcMain.handle('fetch-pr-reviews', async (event, opts) => {
+        return runs.fetchPRReviewsHandler(opts, { getToken });
+    });
+
     ipcMain.handle('start-watching', async (event, opts) => {
         return runs.startWatching(opts, { db, poller, getToken });
     });
