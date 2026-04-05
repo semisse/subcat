@@ -111,6 +111,7 @@
         }
 
         .input-section {
+            padding-top: 12px;
             -webkit-app-region: no-drag;
         }
 
@@ -558,6 +559,7 @@
 
         .loading-state.visible {
             display: flex;
+            flex: 1;
             animation: fadeIn 0.25s ease forwards;
         }
 
@@ -664,8 +666,9 @@
         .back-btn {
             background: none;
             border: none;
-            color: #888;
-            font-size: 16px;
+            color: #bbb;
+            font-size: 18px;
+            font-weight: 600;
             cursor: pointer;
             padding: 0;
             line-height: 1;
@@ -773,19 +776,19 @@
 
         .workflow-rerun-btn {
             padding: 4px 10px;
-            border: 1px solid #533483;
+            border: none;
             border-radius: 6px;
-            background: none;
-            color: #a78bfa;
+            background: #238636;
+            color: #fff;
             font-size: 11px;
+            font-weight: 600;
             cursor: pointer;
             -webkit-app-region: no-drag;
+            transition: background 0.2s;
         }
 
         .workflow-rerun-btn:hover {
-            background: rgba(83, 52, 131, 0.2);
-            border-color: #a78bfa;
-            color: #c4b5fd;
+            background: #2ea043;
         }
 
         .workflow-rerun-btn:disabled {
@@ -936,6 +939,27 @@
             font-size: 11px;
             color: #555;
             margin-left: 4px;
+        }
+
+        .pr-loading-spinner {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border: 1.5px solid #333;
+            border-top-color: #666;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .run-actions .open-btn {
+            border-color: transparent;
+            color: #555;
+        }
+
+        .run-actions .open-btn:hover {
+            border-color: transparent;
+            background: none;
+            color: #aaa;
         }
     </style>
 </head>

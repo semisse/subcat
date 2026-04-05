@@ -129,7 +129,7 @@ async function loadUserPRs() {
                 <div class="my-pr-title">${escapeHtml(pr.title)}</div>
             </div>
             <div class="pr-ci-badge">
-                <span class="status-dot in_progress"></span>
+                <span class="pr-loading-spinner"></span>
             </div>
         `;
         item.addEventListener('click', () => openPRDetail(pr));
@@ -137,13 +137,14 @@ async function loadUserPRs() {
 
         window.api.fetchPRRuns(`https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`)
             .then(r => {
-                const dot = item.querySelector('.status-dot');
-                if (!dot) return;
-                dot.className = `status-dot ${r.error || !r.runs?.length ? '' : aggregatePRStatus(r.runs)}`;
+                const badge = item.querySelector('.pr-ci-badge');
+                if (!badge) return;
+                const status = r.error || !r.runs?.length ? '' : aggregatePRStatus(r.runs);
+                badge.innerHTML = `<span class="status-dot ${status}"></span>`;
             })
             .catch(() => {
-                const dot = item.querySelector('.status-dot');
-                if (dot) dot.className = 'status-dot';
+                const badge = item.querySelector('.pr-ci-badge');
+                if (badge) badge.innerHTML = '<span class="status-dot"></span>';
             });
     }
 }
@@ -279,6 +280,7 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     workflowRunsRerunBtn.style.display = hasActiveRun ? 'none' : '';
     workflowRepeatInput.parentElement.style.display = hasActiveRun ? 'none' : '';
     workflowRepeatInput.value = '1';
+    workflowRunsRerunBtn.textContent = '↩ Rerun';
 
     for (const [i, run] of result.runs.entries()) {
         const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
@@ -308,6 +310,12 @@ workflowRunsReportBtn.addEventListener('click', () => {
     if (currentWorkflowRuns) {
         window.api.savePRWorkflowReport({ workflowName: workflowRunsTitle.textContent, runs: currentWorkflowRuns });
     }
+});
+
+workflowRepeatInput.addEventListener('input', () => {
+    if (workflowRunsRerunBtn.disabled) return;
+    const n = parseInt(workflowRepeatInput.value, 10) || 1;
+    workflowRunsRerunBtn.textContent = n > 1 ? `↩ Rerun ×${n}` : '↩ Rerun';
 });
 
 workflowRunsRerunBtn.addEventListener('click', async () => {
@@ -549,7 +557,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
         <div class="run-card-header">
             <div class="run-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
             <div class="run-actions">
-                <button class="open-btn">Open</button>
+                <button class="open-btn" title="Open in GitHub">↗</button>
                 ${status !== 'completed' ? '<button class="cancel-run-btn">Stop</button>' : ''}
                 <button class="remove-btn" title="Remove">×</button>
             </div>
@@ -839,7 +847,7 @@ function addPinnedWorkflowCard(id, name, workflowUrl, latestRunStatus, latestRun
         <div class="run-card-header">
             <div class="run-name" title="${escapeHtml(name)}">📌 ${escapeHtml(name)}</div>
             <div class="run-actions">
-                ${latestRunUrl ? '<button class="open-btn">Open</button>' : ''}
+                ${latestRunUrl ? '<button class="open-btn" title="Open in GitHub">↗</button>' : ''}
                 <button class="remove-btn" title="Unpin">×</button>
             </div>
         </div>
@@ -882,7 +890,8 @@ function updatePinnedWorkflowCard(id, latestRunStatus, latestRunConclusion, late
         if (!openBtn) {
             openBtn = document.createElement('button');
             openBtn.className = 'open-btn';
-            openBtn.textContent = 'Open';
+            openBtn.title = 'Open in GitHub';
+            openBtn.textContent = '↗';
             actions.insertBefore(openBtn, actions.querySelector('.remove-btn'));
         }
         openBtn.onclick = () => window.api.openExternal(latestRunUrl);
