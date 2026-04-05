@@ -1,6 +1,10 @@
 jest.mock('../../src/core/github');
 const github = require('../../src/core/github');
-const { rerunRun, rerunFailedRun, stopWatching, cancelRunHandler, resumeRuns } = require('../../src/core/runs');
+const {
+    rerunRun, rerunFailedRun, stopWatching, cancelRunHandler, resumeRuns,
+    watchWorkflowRerun, fetchRunAttemptsHandler,
+    pinWorkflow, unpinWorkflow, resumePinnedWorkflows,
+} = require('../../src/core/runs');
 
 function makeDb(overrides = {}) {
     return {
@@ -22,6 +26,19 @@ function makePoller(overrides = {}) {
         stop: jest.fn(),
         deactivate: jest.fn(),
         isActive: jest.fn(() => false),
+        watchAttempt: jest.fn(),
+        ...overrides,
+    };
+}
+
+function makePinnedDb(overrides = {}) {
+    return {
+        ...makeDb(),
+        getPinnedWorkflow: jest.fn(() => null),
+        getAllPinnedWorkflows: jest.fn(() => []),
+        addPinnedWorkflow: jest.fn(),
+        updatePinnedWorkflow: jest.fn(),
+        removePinnedWorkflow: jest.fn(),
         ...overrides,
     };
 }
@@ -188,5 +205,176 @@ describe('resumeRuns', () => {
         resumeRuns({ db, poller, getToken: () => 'tok', sendToWindow: jest.fn() });
 
         expect(poller.start).toHaveBeenCalled();
+    });
+});
+
+// ─── watchWorkflowRerun ───────────────────────────────────────────────────────
+
+describe('watchWorkflowRerun', () => {
+    test('calls rerunWorkflow and starts watchAttempt', async () => {
+        github.rerunWorkflow.mockResolvedValue(undefined);
+        const poller = makePoller();
+        const result = await watchWorkflowRerun(
+            { owner: 'owner', repo: 'repo', runId: '1', previousAttemptCount: 2 },
+            { getToken: () => 'tok', poller }
+        );
+        expect(github.rerunWorkflow).toHaveBeenCalledWith('owner', 'repo', '1', 'tok');
+        expect(poller.watchAttempt).toHaveBeenCalledWith(
+            { owner: 'owner', repo: 'repo', runId: '1', previousAttemptCount: 2 },
+            expect.any(Function)
+        );
+        expect(result).toEqual({ started: true });
+    });
+
+    test('returns error when rerunWorkflow fails', async () => {
+        github.rerunWorkflow.mockRejectedValue(new Error('API error'));
+        const poller = makePoller();
+        const result = await watchWorkflowRerun(
+            { owner: 'owner', repo: 'repo', runId: '1', previousAttemptCount: 1 },
+            { getToken: () => 'tok', poller }
+        );
+        expect(result).toEqual({ error: 'API error' });
+        expect(poller.watchAttempt).not.toHaveBeenCalled();
+    });
+});
+
+// ─── fetchRunAttemptsHandler ──────────────────────────────────────────────────
+
+describe('fetchRunAttemptsHandler', () => {
+    test('returns attempts from github', async () => {
+        github.fetchRunAttempts.mockResolvedValue({
+            attempts: [{ runAttempt: 2 }, { runAttempt: 1 }],
+            totalAttempts: 2,
+        });
+        const result = await fetchRunAttemptsHandler(
+            { owner: 'owner', repo: 'repo', runId: '1' },
+            { getToken: () => 'tok' }
+        );
+        expect(result.runs).toHaveLength(2);
+        expect(result.totalAttempts).toBe(2);
+    });
+
+    test('returns error on API failure', async () => {
+        github.fetchRunAttempts.mockRejectedValue(new Error('not found'));
+        const result = await fetchRunAttemptsHandler(
+            { owner: 'owner', repo: 'repo', runId: '999' },
+            { getToken: () => 'tok' }
+        );
+        expect(result).toEqual({ error: 'not found' });
+    });
+});
+
+// ─── pinWorkflow ──────────────────────────────────────────────────────────────
+
+describe('pinWorkflow', () => {
+    const WORKFLOW_URL = 'https://github.com/owner/repo/actions/workflows/ci.yml';
+    const PARSED = { owner: 'owner', repo: 'repo', workflowFile: 'ci.yml' };
+
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    test('returns error for invalid URL', async () => {
+        github.parseWorkflowUrl.mockReturnValue(null);
+        const db = makePinnedDb();
+        const result = await pinWorkflow({ url: 'https://github.com/owner/repo/pull/1' }, { db, getToken: () => 'tok', onUpdate: jest.fn() });
+        expect(result.error).toMatch(/Invalid/);
+    });
+
+    test('returns error when workflow already pinned', async () => {
+        github.parseWorkflowUrl.mockReturnValue(PARSED);
+        const db = makePinnedDb({ getPinnedWorkflow: jest.fn(() => ({ id: 'owner/repo/ci.yml' })) });
+        const result = await pinWorkflow(
+            { url: WORKFLOW_URL },
+            { db, getToken: () => 'tok', onUpdate: jest.fn() }
+        );
+        expect(result.error).toMatch(/already pinned/);
+    });
+
+    test('fetches workflow info and latest run, saves to db', async () => {
+        github.parseWorkflowUrl.mockReturnValue(PARSED);
+        github.fetchWorkflowInfo.mockResolvedValue({ name: 'CI Pipeline' });
+        github.fetchLatestWorkflowRun.mockResolvedValue({ id: 42, status: 'completed', conclusion: 'success' });
+        const db = makePinnedDb();
+
+        const result = await pinWorkflow({ url: WORKFLOW_URL }, { db, getToken: () => 'tok', onUpdate: jest.fn() });
+
+        expect(result.pinned).toBe(true);
+        expect(result.name).toBe('CI Pipeline');
+        expect(result.latestRunId).toBe('42');
+        expect(db.addPinnedWorkflow).toHaveBeenCalledWith(expect.objectContaining({
+            id: 'owner/repo/ci.yml',
+            name: 'CI Pipeline',
+            workflowFile: 'ci.yml',
+        }));
+    });
+
+    test('proceeds when fetchLatestWorkflowRun fails (no runs yet)', async () => {
+        github.parseWorkflowUrl.mockReturnValue(PARSED);
+        github.fetchWorkflowInfo.mockResolvedValue({ name: 'CI' });
+        github.fetchLatestWorkflowRun.mockRejectedValue(new Error('no runs'));
+        const db = makePinnedDb();
+
+        const result = await pinWorkflow({ url: WORKFLOW_URL }, { db, getToken: () => 'tok', onUpdate: jest.fn() });
+
+        expect(result.pinned).toBe(true);
+        expect(result.latestRunId).toBeNull();
+    });
+
+    test('returns error when fetchWorkflowInfo fails', async () => {
+        github.parseWorkflowUrl.mockReturnValue(PARSED);
+        github.fetchWorkflowInfo.mockRejectedValue(new Error('workflow not found'));
+        github.fetchLatestWorkflowRun.mockResolvedValue(null);
+        const db = makePinnedDb();
+
+        const result = await pinWorkflow({ url: WORKFLOW_URL }, { db, getToken: () => 'tok', onUpdate: jest.fn() });
+
+        expect(result.error).toBe('workflow not found');
+    });
+});
+
+// ─── unpinWorkflow ────────────────────────────────────────────────────────────
+
+describe('unpinWorkflow', () => {
+    test('removes pinned workflow from db', () => {
+        const db = makePinnedDb();
+        const result = unpinWorkflow('owner/repo/ci.yml', { db });
+        expect(db.removePinnedWorkflow).toHaveBeenCalledWith('owner/repo/ci.yml');
+        expect(result).toEqual({ unpinned: true });
+    });
+});
+
+// ─── resumePinnedWorkflows ────────────────────────────────────────────────────
+
+describe('resumePinnedWorkflows', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    test('sends pinned-workflow-restored for each saved workflow', () => {
+        const pw = {
+            id: 'owner/repo/ci.yml',
+            name: 'CI', url: 'https://github.com/owner/repo/actions/workflows/ci.yml',
+            owner: 'owner', repo: 'repo', workflow_file: 'ci.yml',
+            latest_run_id: '10', latest_run_status: 'completed',
+            latest_run_conclusion: 'success', latest_run_url: 'https://github.com/owner/repo/actions/runs/10',
+        };
+        const db = makePinnedDb({ getAllPinnedWorkflows: jest.fn(() => [pw]) });
+        const sendToWindow = jest.fn();
+
+        resumePinnedWorkflows({ db, getToken: () => 'tok', sendToWindow });
+
+        expect(sendToWindow).toHaveBeenCalledWith('pinned-workflow-restored', expect.objectContaining({
+            id: 'owner/repo/ci.yml',
+            name: 'CI',
+            latestRunStatus: 'completed',
+        }));
+    });
+
+    test('sends nothing when no pinned workflows', () => {
+        const db = makePinnedDb();
+        const sendToWindow = jest.fn();
+
+        resumePinnedWorkflows({ db, getToken: () => 'tok', sendToWindow });
+
+        expect(sendToWindow).not.toHaveBeenCalled();
     });
 });

@@ -169,6 +169,60 @@ describe('repeat runs', () => {
     });
 });
 
+// ─── watchAttempt ─────────────────────────────────────────────────────────────
+
+describe('watchAttempt', () => {
+    test('emits run:new-attempt when attempt count increases', async () => {
+        github.githubGet
+            .mockResolvedValueOnce({ run_attempt: 2 });
+
+        const onNewAttempt = jest.fn();
+        poller.on('run:new-attempt', onNewAttempt);
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '1', previousAttemptCount: 1 }, () => 'token');
+        await tick();
+
+        expect(onNewAttempt).toHaveBeenCalledWith({ owner: 'owner', repo: 'repo', runId: '1' });
+    });
+
+    test('does not emit when attempt count has not changed', async () => {
+        github.githubGet
+            .mockResolvedValueOnce({ run_attempt: 1 })
+            .mockResolvedValueOnce({ run_attempt: 2 });
+
+        const onNewAttempt = jest.fn();
+        poller.on('run:new-attempt', onNewAttempt);
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '2', previousAttemptCount: 1 }, () => 'token');
+        await tick(); // first poll: no change
+        await tick(); // second poll: new attempt
+
+        expect(onNewAttempt).toHaveBeenCalledTimes(1);
+    });
+
+    test('second watchAttempt call for same runId is a no-op', async () => {
+        github.githubGet.mockResolvedValue({ run_attempt: 2 });
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '3', previousAttemptCount: 1 }, () => 'token');
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '3', previousAttemptCount: 1 }, () => 'token');
+        await tick();
+
+        expect(github.githubGet).toHaveBeenCalledTimes(1);
+    });
+
+    test('stops on non-transient error without emitting', async () => {
+        github.githubGet.mockRejectedValue(new Error('server error'));
+
+        const onNewAttempt = jest.fn();
+        poller.on('run:new-attempt', onNewAttempt);
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '4', previousAttemptCount: 1 }, () => 'token');
+        await tick();
+
+        expect(onNewAttempt).not.toHaveBeenCalled();
+    });
+});
+
 // ─── error handling ───────────────────────────────────────────────────────────
 
 describe('error handling', () => {

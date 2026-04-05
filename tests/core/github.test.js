@@ -1,6 +1,6 @@
 jest.mock('https');
 const https = require('https');
-const { parseGitHubUrl, parsePRUrl, githubGet, fetchFailedTests, fetchPRRuns, rerunWorkflow, rerunFailedJobs, cancelRun } = require('../../src/core/github');
+const { parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchFailedTests, fetchPRRuns, fetchRunAttempts, fetchWorkflowInfo, fetchLatestWorkflowRun, rerunWorkflow, rerunFailedJobs, cancelRun } = require('../../src/core/github');
 
 // Helper to create a mock https response
 function mockResponse(statusCode, body) {
@@ -231,9 +231,11 @@ describe('fetchPRRuns', () => {
             ]}]
         );
         const result = await fetchPRRuns('owner', 'repo', '42', 'token');
-        expect(result).toHaveLength(2);
-        expect(result[0]).toMatchObject({ runId: '1', name: 'CI', status: 'completed', conclusion: 'failure' });
-        expect(result[1]).toMatchObject({ runId: '3', name: 'Lint', status: 'in_progress' });
+        expect(result.runs).toHaveLength(2);
+        expect(result.runs[0]).toMatchObject({ runId: '1', name: 'CI', status: 'completed', conclusion: 'failure' });
+        expect(result.runs[1]).toMatchObject({ runId: '3', name: 'Lint', status: 'in_progress' });
+        expect(result.owner).toBe('owner');
+        expect(result.repo).toBe('repo');
     });
 
     test('returns empty array when no runs exist for PR', async () => {
@@ -242,7 +244,7 @@ describe('fetchPRRuns', () => {
             [200, { workflow_runs: [] }]
         );
         const result = await fetchPRRuns('owner', 'repo', '42', 'token');
-        expect(result).toEqual([]);
+        expect(result.runs).toEqual([]);
     });
 
     test('rejects when PR fetch fails', async () => {
@@ -359,5 +361,110 @@ describe('fetchFailedTests', () => {
 
         const result = await fetchFailedTests('owner', 'repo', '123', 'token');
         expect(result).toEqual(['Build', 'Deploy']);
+    });
+});
+
+// ─── parseWorkflowUrl ─────────────────────────────────────────────────────────
+
+describe('parseWorkflowUrl', () => {
+    test('parses a valid workflow URL', () => {
+        expect(parseWorkflowUrl('https://github.com/owner/repo/actions/workflows/ci.yml'))
+            .toEqual({ owner: 'owner', repo: 'repo', workflowFile: 'ci.yml' });
+    });
+
+    test('ignores query string', () => {
+        expect(parseWorkflowUrl('https://github.com/owner/repo/actions/workflows/ci.yml?query=branch%3Amain'))
+            .toEqual({ owner: 'owner', repo: 'repo', workflowFile: 'ci.yml' });
+    });
+
+    test('returns null for a run URL', () => {
+        expect(parseWorkflowUrl('https://github.com/owner/repo/actions/runs/123')).toBeNull();
+    });
+
+    test('returns null for a PR URL', () => {
+        expect(parseWorkflowUrl('https://github.com/owner/repo/pull/42')).toBeNull();
+    });
+
+    test('returns null for empty string', () => {
+        expect(parseWorkflowUrl('')).toBeNull();
+    });
+});
+
+// ─── fetchRunAttempts ─────────────────────────────────────────────────────────
+
+describe('fetchRunAttempts', () => {
+    function mockGetSequence(...responses) {
+        for (const [statusCode, body] of responses) {
+            const EventEmitter = require('events');
+            const res = new EventEmitter();
+            res.statusCode = statusCode;
+            const req = new EventEmitter();
+            req.end = jest.fn(() => { res.emit('data', JSON.stringify(body)); res.emit('end'); });
+            https.request.mockImplementationOnce((_, cb) => { cb(res); return req; });
+        }
+    }
+
+    test('returns attempts newest-first with totalAttempts', async () => {
+        const run = { run_attempt: 2, status: 'completed', conclusion: 'success', html_url: 'https://github.com/o/r/actions/runs/1' };
+        mockGetSequence(
+            [200, { run_attempt: 2 }],  // initial run fetch
+            [200, { ...run, run_attempt: 2 }], // attempt 2
+            [200, { ...run, run_attempt: 1 }], // attempt 1
+        );
+        const result = await fetchRunAttempts('owner', 'repo', '1', 'token');
+        expect(result.totalAttempts).toBe(2);
+        expect(result.attempts).toHaveLength(2);
+        expect(result.attempts[0].runAttempt).toBe(2);
+        expect(result.attempts[1].runAttempt).toBe(1);
+    });
+
+    test('includes correct url with attempt number', async () => {
+        const run = { run_attempt: 1, status: 'completed', conclusion: 'success', html_url: 'https://github.com/o/r/actions/runs/5' };
+        mockGetSequence([200, { run_attempt: 1 }], [200, run]);
+        const { attempts } = await fetchRunAttempts('owner', 'repo', '5', 'token');
+        expect(attempts[0].url).toBe('https://github.com/owner/repo/actions/runs/5/attempts/1');
+    });
+
+    test('rejects when initial run fetch fails', async () => {
+        mockGetSequence([404, {}]);
+        await expect(fetchRunAttempts('owner', 'repo', '999', 'token')).rejects.toThrow('GitHub API 404');
+    });
+});
+
+// ─── fetchWorkflowInfo ────────────────────────────────────────────────────────
+
+describe('fetchWorkflowInfo', () => {
+    test('returns workflow info', async () => {
+        mockResponse(200, { id: 10, name: 'CI', state: 'active' });
+        const result = await fetchWorkflowInfo('owner', 'repo', 'ci.yml', 'token');
+        expect(result.name).toBe('CI');
+    });
+
+    test('rejects on 404', async () => {
+        mockResponse(404, {});
+        await expect(fetchWorkflowInfo('owner', 'repo', 'missing.yml', 'token')).rejects.toThrow('GitHub API 404');
+    });
+});
+
+// ─── fetchLatestWorkflowRun ───────────────────────────────────────────────────
+
+describe('fetchLatestWorkflowRun', () => {
+    test('returns first run from workflow_runs', async () => {
+        const run = { id: 99, status: 'in_progress', conclusion: null };
+        mockResponse(200, { workflow_runs: [run] });
+        const result = await fetchLatestWorkflowRun('owner', 'repo', 'ci.yml', 'token');
+        expect(result.id).toBe(99);
+        expect(result.status).toBe('in_progress');
+    });
+
+    test('returns null when no runs exist', async () => {
+        mockResponse(200, { workflow_runs: [] });
+        const result = await fetchLatestWorkflowRun('owner', 'repo', 'ci.yml', 'token');
+        expect(result).toBeNull();
+    });
+
+    test('rejects on API error', async () => {
+        mockResponse(403, {});
+        await expect(fetchLatestWorkflowRun('owner', 'repo', 'ci.yml', 'token')).rejects.toThrow('GitHub API 403');
     });
 });

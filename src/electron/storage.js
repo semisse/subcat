@@ -27,7 +27,7 @@ function loadToken() {
 }
 
 function clearToken() {
-    try { fs.unlinkSync(getTokenFile()); } catch {}
+    try { fs.unlinkSync(getTokenFile()); } catch (_) { /* file may not exist */ }
 }
 
 module.exports = { storeToken, loadToken, clearToken };
