@@ -27,7 +27,7 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         setAboutPanelOptions: jest.fn(),
         whenReady: jest.fn().mockResolvedValue(undefined),
         on: jest.fn(),
-        dock: { setIcon: jest.fn() },
+        dock: { setIcon: jest.fn(), hide: jest.fn() },
         getPath: jest.fn(() => '/tmp'),
         getVersion: jest.fn(() => '1.0.0'),
         quit: jest.fn(),
@@ -37,15 +37,21 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
     const ipcHandlers = {};
 
     jest.doMock('electron-updater', () => ({ autoUpdater }));
+    const mockTray = { setImage: jest.fn(), setToolTip: jest.fn(), on: jest.fn() };
     jest.doMock('electron', () => ({
         app,
         BrowserWindow,
+        Tray: jest.fn(() => mockTray),
         ipcMain: { handle: jest.fn((ch, fn) => { ipcHandlers[ch] = fn; }) },
         Menu: { buildFromTemplate: jest.fn(() => ({})), setApplicationMenu: jest.fn() },
         Notification: jest.fn(() => ({ on: jest.fn(), show: jest.fn() })),
         nativeImage: { createFromPath: jest.fn(() => ({})) },
         shell: { openExternal: jest.fn() },
         dialog,
+    }));
+    jest.doMock('../../src/electron/tray', () => ({
+        createTray: jest.fn(() => ({ tray: mockTray, setState: jest.fn() })),
+        STATE: { IDLE: 'idle', WATCHING: 'watching', ERROR: 'error' },
     }));
     jest.doMock('../../src/core/auth', () => ({
         fetchUser: fetchUserResult
