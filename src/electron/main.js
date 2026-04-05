@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -74,6 +74,9 @@ notifications.register(poller, getWindow);
 
 app.whenReady().then(async () => {
     app.dock?.setIcon(appIcon);
+
+    buildMenu();
+
     const token = storage.loadToken();
     if (token) {
         try {
@@ -92,6 +95,59 @@ app.whenReady().then(async () => {
         createLoginWindow();
     }
 });
+
+function buildMenu() {
+    const template = [
+        {
+            label: app.name,
+            submenu: [
+                { role: 'about' },
+                { type: 'separator' },
+                { role: 'services' },
+                { type: 'separator' },
+                { role: 'hide' },
+                { role: 'hideOthers' },
+                { role: 'unhide' },
+                { type: 'separator' },
+                { role: 'quit' }
+            ]
+        },
+        {
+            label: 'File',
+            submenu: [
+                {
+                    label: 'New Watch\u2026',
+                    accelerator: 'CmdOrCtrl+N',
+                    click() {
+                        mainWindow?.webContents.send('open-new-watch');
+                    }
+                }
+            ]
+        },
+        {
+            label: 'Edit',
+            submenu: [
+                { role: 'undo' },
+                { role: 'redo' },
+                { type: 'separator' },
+                { role: 'cut' },
+                { role: 'copy' },
+                { role: 'paste' },
+                { role: 'selectAll' }
+            ]
+        },
+        {
+            label: 'Window',
+            submenu: [
+                { role: 'minimize' },
+                { role: 'zoom' },
+                { role: 'front' }
+            ]
+        }
+    ];
+
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 app.on('window-all-closed', () => { app.quit(); });
 

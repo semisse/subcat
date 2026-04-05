@@ -35,6 +35,7 @@ Download the latest `.dmg` from [Releases](../../releases), open it, and drag Su
 - Export results to CSV
 - Runs persist across restarts — pick up where you left off
 - Token encrypted via macOS Keychain (`safeStorage`)
+- Open the "New Watch" form from the File menu or with `⌘N`
 
 ## Dev setup
 

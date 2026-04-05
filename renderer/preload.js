@@ -32,5 +32,6 @@ contextBridge.exposeInMainWorld('api', {
     authStartLogin: () => ipcRenderer.invoke('auth-start-login'),
     authLogout: () => ipcRenderer.invoke('auth-logout'),
     onAuthLoggedIn: (callback) => ipcRenderer.on('auth-logged-in', (_, data) => callback(data)),
-    onAuthError: (callback) => ipcRenderer.on('auth-error', (_, data) => callback(data))
+    onAuthError: (callback) => ipcRenderer.on('auth-error', (_, data) => callback(data)),
+    onOpenNewWatch: (callback) => ipcRenderer.on('open-new-watch', () => callback())
 });

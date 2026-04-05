@@ -359,6 +359,12 @@ addBtn.addEventListener('click', () => {
     urlInput.focus();
 });
 
+window.api.onOpenNewWatch(() => {
+    if (currentView !== 'main') return;
+    if (urlForm.style.display === 'block') return; // already open
+    addBtn.click();
+});
+
 cancelBtn.addEventListener('click', () => resetForm());
 
 const prPicker = document.getElementById('prPicker');

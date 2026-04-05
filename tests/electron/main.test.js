@@ -41,6 +41,7 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         app,
         BrowserWindow,
         ipcMain: { handle: jest.fn((ch, fn) => { ipcHandlers[ch] = fn; }) },
+        Menu: { buildFromTemplate: jest.fn(() => ({})), setApplicationMenu: jest.fn() },
         Notification: jest.fn(() => ({ on: jest.fn(), show: jest.fn() })),
         nativeImage: { createFromPath: jest.fn(() => ({})) },
         shell: { openExternal: jest.fn() },
