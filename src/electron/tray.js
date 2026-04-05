@@ -73,15 +73,14 @@ function createTray({ getWindow, poller }) {
         const win = getWindow();
         if (!win) return;
 
-        if (win.isVisible()) {
+        if (win.isVisible() && win.isFocused()) {
             win.hide();
         } else {
             win.show();
             win.focus();
+            unseenErrors = 0;
+            applyState();
         }
-        // Clear error badge once user opens the window
-        unseenErrors = 0;
-        applyState();
     });
 
     // ── Public API ──────────────────────────────────────────────────────────

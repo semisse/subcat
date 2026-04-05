@@ -25,6 +25,7 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
     const app = {
         setName: jest.fn(),
         setAboutPanelOptions: jest.fn(),
+        setActivationPolicy: jest.fn(),
         whenReady: jest.fn().mockResolvedValue(undefined),
         on: jest.fn(),
         dock: { setIcon: jest.fn(), hide: jest.fn() },

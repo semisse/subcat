@@ -16,6 +16,9 @@ const ipcReports = require('./ipc/reports');
 
 app.setName('SubCat');
 
+// True menu bar app — no Dock icon, no cmd+tab appearance
+if (process.platform === 'darwin') app.setActivationPolicy('accessory');
+
 app.setAboutPanelOptions({
     applicationName: 'SubCat',
     applicationVersion: app.getVersion(),
@@ -83,7 +86,6 @@ notifications.register(poller, getWindow);
 
 app.whenReady().then(async () => {
     app.dock?.setIcon(appIcon);
-    app.dock?.hide();
 
     buildMenu();
 
