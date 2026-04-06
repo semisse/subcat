@@ -15,15 +15,19 @@ const ipcReports = require('./ipc/reports');
 
 app.setName('SubCat');
 
-app.setAboutPanelOptions({
-    applicationName: 'SubCat',
-    applicationVersion: app.getVersion(),
-    copyright: '© Samuel Fialho',
-    tagline: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
-    credits: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
-    website: 'https://github.com/semisse/subcat',
-    iconPath: path.join(__dirname, '../../assets', 'Icon-iOS-Default-1024x1024@1x.png'),
-});
+const isMac = process.platform === 'darwin';
+
+if (isMac) {
+    app.setAboutPanelOptions({
+        applicationName: 'SubCat',
+        applicationVersion: app.getVersion(),
+        copyright: '© Samuel Fialho',
+        tagline: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
+        credits: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
+        website: 'https://github.com/semisse/subcat',
+        iconPath: path.join(__dirname, '../../assets', 'Icon-iOS-Default-1024x1024@1x.png'),
+    });
+}
 
 if (process.env.NODE_ENV === 'development') {
     require('electron-reload')(path.join(__dirname, '../../'), {
@@ -46,8 +50,10 @@ const windowPrefs = {
         contextIsolation: true,
         nodeIntegration: false
     },
-    titleBarStyle: 'hiddenInset',
-    vibrancy: 'sidebar'
+    ...(isMac && {
+        titleBarStyle: 'hiddenInset',
+        vibrancy: 'sidebar'
+    })
 };
 
 function createLoginWindow() {
@@ -73,7 +79,9 @@ notifications.register(poller, getWindow);
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-    app.dock?.setIcon(appIcon);
+    if (isMac) {
+        app.dock?.setIcon(appIcon);
+    }
 
     buildMenu();
 
@@ -97,7 +105,7 @@ app.whenReady().then(async () => {
 });
 
 function buildMenu() {
-    const template = [
+    const macAppMenu = isMac ? [
         {
             label: app.name,
             submenu: [
@@ -111,7 +119,11 @@ function buildMenu() {
                 { type: 'separator' },
                 { role: 'quit' }
             ]
-        },
+        }
+    ] : [];
+
+    const template = [
+        ...macAppMenu,
         {
             label: 'File',
             submenu: [
@@ -121,7 +133,9 @@ function buildMenu() {
                     click() {
                         mainWindow?.webContents.send('open-new-watch');
                     }
-                }
+                },
+                { type: 'separator' },
+                { role: 'quit' }
             ]
         },
         {
@@ -141,7 +155,7 @@ function buildMenu() {
             submenu: [
                 { role: 'minimize' },
                 { role: 'zoom' },
-                { role: 'front' }
+                ...(isMac ? [{ role: 'front' }] : [])
             ]
         }
     ];
@@ -200,7 +214,22 @@ ipcMain.handle('open-external', async (event, url) => {
 
 ipcMain.handle('get-version', () => app.getVersion());
 
-ipcMain.handle('show-about', () => app.showAboutPanel());
+ipcMain.handle('show-about', () => {
+    if (isMac) {
+        app.showAboutPanel();
+    } else {
+        const { dialog } = require('electron');
+        const dialogParent = mainWindow ?? undefined;
+        dialog.showMessageBox(dialogParent, {
+            type: 'info',
+            title: 'About SubCat',
+            message: `SubCat ${app.getVersion()}`,
+            detail: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.\n\n© Samuel Fialho\nhttps://github.com/semisse/subcat',
+            buttons: ['OK'],
+            defaultId: 0
+        });
+    }
+});
 
 ipcMain.handle('refresh-runs', () => {
     const sendToWindow = (ch, data) => mainWindow?.webContents.send(ch, data);
