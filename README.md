@@ -15,12 +15,6 @@ A macOS app that monitors GitHub Actions runs and sends native notifications whe
 
 Download the latest `.dmg` from [Releases](../../releases), open it, and drag SubCat to your Applications folder.
 
-> [!WARNING]
-> SubCat is not signed with an Apple Developer certificate. macOS will show a **"damaged and can't be opened"** error. Run this once in Terminal after installing:
-> ```bash
-> xattr -rd com.apple.quarantine /Applications/SubCat.app
-> ```
-
 ## How it works
 
 1. Log in with your GitHub account (OAuth Device Flow — no password stored)
