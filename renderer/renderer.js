@@ -34,6 +34,7 @@ const sectionPinned = document.getElementById('sectionPinned');
 const sectionPinnedItems = document.getElementById('sectionPinnedItems');
 const emptyState = document.getElementById('emptyState');
 const loadingState = document.getElementById('loadingState');
+const loadingText = document.getElementById('loadingText');
 const errorContainer = document.getElementById('errorContainer');
 
 const logoutBtn = document.getElementById('logoutBtn');
@@ -79,6 +80,7 @@ refreshBtn.addEventListener('click', async () => {
     watchedRuns.clear();
     runsList.style.display = 'none';
     emptyState.style.display = 'none';
+    loadingText.textContent = 'Refreshing…';
     loadingState.classList.add('visible');
     sectionPinnedItems.innerHTML = '';
     sectionMyPrsItems.innerHTML = '';
@@ -257,10 +259,14 @@ async function openPRDetail(pr) {
     currentPR = pr;
     showPRDetailView();
     prDetailTitle.textContent = `${pr.title} #${pr.number}`;
-    prDetailList.innerHTML = '<div class="pr-detail-loading">Loading workflows…</div>';
+    prDetailList.style.display = 'none';
+    prDetailList.innerHTML = '';
+    loadingText.textContent = 'Loading…';
+    loadingState.classList.add('visible');
 
     const result = await window.api.fetchPRRuns(`https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`);
-    prDetailList.innerHTML = '';
+    loadingState.classList.remove('visible');
+    prDetailList.style.display = 'block';
 
     if (result.error || !result.runs?.length) {
         prDetailList.innerHTML = '<div class="pr-detail-empty">No workflows found.</div>';
