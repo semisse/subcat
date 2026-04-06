@@ -13,7 +13,7 @@
     "build": "electron-builder",
     "build:mac": "electron-builder --mac --config.mac.target=dmg",
     "build:linux": "electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps && ([[ \"$OSTYPE\" == \"darwin\"* ]] \u0026\u0026 plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist \u0026\u0026 plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist || true)"
+    "postinstall": "electron-builder install-app-deps && ([[ \"$OSTYPE\" == \"darwin\"* ]] && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist || true)"
   },
   "build": {
     "appId": "com.samuelfialho.subcat",
@@ -35,11 +35,17 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "maintainer": "Samuel Fialho",
@@ -61,7 +67,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.3",
+    "keytar": "^7.9.0"
   },
   "jest": {
     "testEnvironment": "node",
@@ -76,7 +83,10 @@
       "src/db/**/*.js",
       "src/electron/ipc/**/*.js"
     ],
-    "coverageReporters": ["text", "text-summary"]
+    "coverageReporters": [
+      "text",
+      "text-summary"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

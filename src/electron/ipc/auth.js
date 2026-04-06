@@ -8,7 +8,7 @@ function register({ auth, storage, getWindow, getLoginWindow, setCurrentUser, cr
             const user = await auth.fetchUser(token);
             return { loggedIn: true, login: user.login, avatarUrl: user.avatar_url };
         } catch {
-            storage.clearToken();
+            await storage.clearToken();
             return { loggedIn: false };
         }
     });
@@ -19,7 +19,7 @@ function register({ auth, storage, getWindow, getLoginWindow, setCurrentUser, cr
             shell.openExternal(flow.verificationUri);
             auth.pollForToken(flow.deviceCode, flow.interval)
                 .then(async (token) => {
-                    storage.storeToken(token);
+                    await storage.storeToken(token);
                     const user = await auth.fetchUser(token);
                     setCurrentUser(user);
                     createMainWindow();
@@ -35,7 +35,7 @@ function register({ auth, storage, getWindow, getLoginWindow, setCurrentUser, cr
     });
 
     ipcMain.handle('auth-logout', async () => {
-        storage.clearToken();
+        await storage.clearToken();
         setCurrentUser(null);
         createLoginWindow();
         getWindow()?.close();

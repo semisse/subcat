@@ -79,6 +79,8 @@ notifications.register(poller, getWindow);
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+    await storage.initialize();
+
     if (isMac) {
         app.dock?.setIcon(appIcon);
     }
@@ -96,7 +98,7 @@ app.whenReady().then(async () => {
                 runs.resumePinnedWorkflows({ db, getToken, sendToWindow });
             });
         } catch {
-            storage.clearToken();
+            await storage.clearToken();
             createLoginWindow();
         }
     } else {
