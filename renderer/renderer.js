@@ -76,7 +76,6 @@ refreshBtn.addEventListener('click', async () => {
     }
 
     // main view refresh
-    runsList.innerHTML = '';
     watchedRuns.clear();
     runsList.style.display = 'none';
     emptyState.style.display = 'none';
