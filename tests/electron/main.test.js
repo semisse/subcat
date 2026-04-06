@@ -38,21 +38,15 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
     const ipcHandlers = {};
 
     jest.doMock('electron-updater', () => ({ autoUpdater }));
-    const mockTray = { setImage: jest.fn(), setToolTip: jest.fn(), on: jest.fn() };
     jest.doMock('electron', () => ({
         app,
         BrowserWindow,
-        Tray: jest.fn(() => mockTray),
-        ipcMain: { handle: jest.fn((ch, fn) => { ipcHandlers[ch] = fn; }) },
+        ipcMain: { handle: jest.fn((ch, fn) => { ipcHandlers[ch] = fn; }), removeHandler: jest.fn() },
         Menu: { buildFromTemplate: jest.fn(() => ({})), setApplicationMenu: jest.fn() },
         Notification: jest.fn(() => ({ on: jest.fn(), show: jest.fn() })),
         nativeImage: { createFromPath: jest.fn(() => ({})) },
         shell: { openExternal: jest.fn() },
         dialog,
-    }));
-    jest.doMock('../../src/electron/tray', () => ({
-        createTray: jest.fn(() => ({ tray: mockTray, setState: jest.fn() })),
-        STATE: { IDLE: 'idle', WATCHING: 'watching', ERROR: 'error' },
     }));
     jest.doMock('../../src/core/auth', () => ({
         fetchUser: fetchUserResult

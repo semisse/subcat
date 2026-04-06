@@ -11,6 +11,8 @@ const workflowRunsTitle = document.getElementById('workflowRunsTitle');
 const workflowRunsList = document.getElementById('workflowRunsList');
 const workflowRunsReportBtn = document.getElementById('workflowRunsReportBtn');
 const workflowRunsRerunBtn = document.getElementById('workflowRunsRerunBtn');
+const workflowRunsCancelAllBtn = document.getElementById('workflowRunsCancelAllBtn');
+const workflowRunsPinBtn = document.getElementById('workflowRunsPinBtn');
 const workflowRepeatInput = document.getElementById('workflowRepeatInput');
 
 const pendingRepeatTotals = new Map(); // runId → repeatTotal
@@ -233,6 +235,7 @@ let currentWorkflow = null;
 let currentWorkflowRuns = null;
 let workflowRunsBackTarget = 'pr-detail'; // 'pr-detail' | 'main'
 let level3PollInterval = null;
+let inMemoryPendingRerun = null; // { owner, repo, runId, fromAttempt, total }
 
 function clearLevel3Poll() {
     if (level3PollInterval) {
@@ -280,17 +283,51 @@ async function openPRDetail(pr) {
     }
 }
 
+function createRunItem(run, owner, repo) {
+    const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
+    const isActive = run.status !== 'completed';
+    const item = document.createElement('div');
+    item.className = 'pr-detail-run';
+    item.dataset.attempt = run.runAttempt;
+    item.innerHTML = `
+        <span class="status-dot ${escapeHtml(dotClass)}"></span>
+        <span class="pr-detail-run-name">#${run.runAttempt}</span>
+        <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
+        <div class="pr-detail-run-actions">
+            ${isActive ? '<button class="wf-cancel-run-btn">✕</button>' : ''}
+            <button class="open-run-btn">↗</button>
+        </div>
+    `;
+    item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
+    if (isActive) {
+        item.querySelector('.wf-cancel-run-btn').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            await window.api.cancelRunDirect({ owner, repo, runId: run.runId });
+            btn.remove();
+        });
+    }
+    return item;
+}
+
 async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTarget = 'pr-detail') {
     clearLevel3Poll();
+
+    const isRefresh = currentWorkflow?.runId === workflow.runId &&
+                      currentView === 'workflow-runs' &&
+                      workflowRunsList.querySelector('.pr-detail-run:not([data-placeholder])');
+
     currentWorkflow = workflow;
     workflowRunsBackTarget = backTarget;
     currentPRContext = { owner, repo, headRef: headRef ?? null };
     showWorkflowRunsView();
     workflowRunsTitle.textContent = workflow.name;
-    workflowRunsList.innerHTML = '<div class="pr-detail-loading">Loading runs…</div>';
+
+    if (!isRefresh) {
+        workflowRunsList.innerHTML = '<div class="pr-detail-loading">Loading runs…</div>';
+    }
 
     const result = await window.api.fetchRunAttempts({ owner, repo, runId: workflow.runId });
-    workflowRunsList.innerHTML = '';
 
     if (result.error || !result.runs?.length) {
         workflowRunsList.innerHTML = '<div class="pr-detail-empty">No runs found.</div>';
@@ -301,28 +338,89 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     const hasActiveRun = result.runs.some(r => r.status !== 'completed');
     workflowRunsRerunBtn.style.display = hasActiveRun ? 'none' : '';
     workflowRepeatInput.parentElement.style.display = hasActiveRun ? 'none' : '';
-    workflowRepeatInput.value = '1';
+    workflowRunsCancelAllBtn.style.display = hasActiveRun ? '' : 'none';
     workflowRunsRerunBtn.textContent = '↩ Rerun';
 
-    for (const [i, run] of result.runs.entries()) {
-        const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
-        const item = document.createElement('div');
-        item.className = 'pr-detail-run';
-        const label = `#${result.runs.length - i}`;
-        item.innerHTML = `
-            <span class="status-dot ${escapeHtml(dotClass)}"></span>
-            <span class="pr-detail-run-name">${escapeHtml(label)}</span>
-            <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
-            <div class="pr-detail-run-actions">
-                <button class="open-run-btn">↗</button>
-            </div>
-        `;
-        item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
-        workflowRunsList.appendChild(item);
+    if (isRefresh) {
+        // Remove stale placeholders; will be re-injected below with the correct count
+        workflowRunsList.querySelectorAll('[data-placeholder]').forEach(el => el.remove());
+
+        // Update existing rows in place
+        for (const run of result.runs) {
+            const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
+            const existing = workflowRunsList.querySelector(`[data-attempt="${run.runAttempt}"]`);
+            if (existing) {
+                existing.querySelector('.status-dot').className = `status-dot ${escapeHtml(dotClass)}`;
+                existing.querySelector('.pr-detail-run-status').textContent = formatStatus(run.status, run.conclusion);
+            }
+        }
+
+        // Prepend newly appeared attempts (iterate oldest→newest so prepend gives newest-first order)
+        for (const run of [...result.runs].reverse()) {
+            if (workflowRunsList.querySelector(`[data-attempt="${run.runAttempt}"]`)) continue;
+            workflowRunsList.prepend(createRunItem(run, owner, repo));
+        }
+
+        // Remove cancel button from rows that have now completed
+        for (const run of result.runs) {
+            if (run.status === 'completed') {
+                workflowRunsList.querySelector(`[data-attempt="${run.runAttempt}"] .wf-cancel-run-btn`)?.remove();
+            }
+        }
+    } else {
+        workflowRunsList.innerHTML = '';
+        workflowRepeatInput.value = '1';
+        for (const run of result.runs) {
+            workflowRunsList.appendChild(createRunItem(run, owner, repo));
+        }
     }
 
-    // Auto-refresh every 15s while there's an active run
-    if (hasActiveRun) {
+    // Inject placeholders for pending reruns that GitHub hasn't registered yet.
+    // Use in-memory state first (reliable during auto-refresh); fall back to DB (survives manual refresh).
+    let pending = (inMemoryPendingRerun?.runId === workflow.runId &&
+                   inMemoryPendingRerun?.owner === owner &&
+                   inMemoryPendingRerun?.repo === repo)
+        ? inMemoryPendingRerun
+        : await window.api.getPendingRerun({ owner, repo, runId: workflow.runId });
+
+    if (pending) {
+        const expectedTotal = pending.fromAttempt !== undefined
+            ? pending.fromAttempt + pending.total          // in-memory shape
+            : pending.from_attempt + pending.total;        // DB shape (snake_case)
+        if (result.runs.length >= expectedTotal) {
+            inMemoryPendingRerun = null;
+            window.api.deletePendingRerun({ owner, repo, runId: workflow.runId });
+        } else {
+            const missingCount = expectedTotal - result.runs.length;
+            for (let i = 1; i <= missingCount; i++) {
+                const attemptLabel = `#${result.runs.length + i}`;
+                const placeholder = document.createElement('div');
+                placeholder.className = 'pr-detail-run placeholder';
+                placeholder.dataset.placeholder = 'true';
+                placeholder.innerHTML = `
+                    <span class="status-dot idle"></span>
+                    <span class="pr-detail-run-name">${escapeHtml(attemptLabel)}</span>
+                    <span class="pr-detail-run-status">Queued</span>
+                    <div class="pr-detail-run-actions">
+                        <button class="wf-cancel-run-btn">✕</button>
+                    </div>
+                `;
+                placeholder.querySelector('.wf-cancel-run-btn').addEventListener('click', async (e) => {
+                    e.currentTarget.disabled = true;
+                    workflowRunsCancelAllBtn.click();
+                });
+                workflowRunsList.prepend(placeholder);
+            }
+        }
+    }
+
+    // Auto-refresh every 15s while there's an active run OR pending reruns still expected
+    const hasPendingReruns = !!pending && result.runs.length < (
+        pending.fromAttempt !== undefined
+            ? pending.fromAttempt + pending.total
+            : pending.from_attempt + pending.total
+    );
+    if (hasActiveRun || hasPendingReruns) {
         level3PollInterval = setInterval(() => {
             if (currentView === 'workflow-runs' && currentWorkflow && currentPRContext) {
                 openWorkflowRuns(currentWorkflow, currentPRContext, workflowRunsBackTarget);
@@ -331,6 +429,8 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
             }
         }, 15000);
     }
+
+    updatePinBtnState();
 }
 
 prDetailBack.addEventListener('click', showMainView);
@@ -339,10 +439,57 @@ workflowRunsBack.addEventListener('click', () => {
     else if (currentPR) openPRDetail(currentPR);
     else showPRDetailView();
 });
+workflowRunsCancelAllBtn.addEventListener('click', async () => {
+    if (!currentWorkflowRuns || !currentPRContext) return;
+    workflowRunsCancelAllBtn.disabled = true;
+    const activeRuns = currentWorkflowRuns.filter(r => r.status !== 'completed');
+    await Promise.all(activeRuns.map(r =>
+        window.api.cancelRunDirect({ owner: currentPRContext.owner, repo: currentPRContext.repo, runId: r.runId })
+    ));
+    inMemoryPendingRerun = null;
+    window.api.deletePendingRerun({ owner: currentPRContext.owner, repo: currentPRContext.repo, runId: currentWorkflowRuns[0].runId });
+    workflowRunsCancelAllBtn.disabled = false;
+    if (currentWorkflow && currentPRContext) {
+        openWorkflowRuns(currentWorkflow, currentPRContext, workflowRunsBackTarget);
+    }
+});
+
 workflowRunsReportBtn.addEventListener('click', () => {
     if (currentWorkflowRuns) {
         window.api.savePRWorkflowReport({ workflowName: workflowRunsTitle.textContent, runs: currentWorkflowRuns });
     }
+});
+
+function updatePinBtnState() {
+    if (!currentWorkflowRuns?.length || !currentPRContext) return;
+    const latestRunId = currentWorkflowRuns[0].runId;
+    const isWatched = watchedRuns.has(latestRunId);
+    workflowRunsPinBtn.textContent = isWatched ? '✓ Watching' : '⊕ Watch';
+    workflowRunsPinBtn.classList.toggle('pinned', isWatched);
+    workflowRunsPinBtn.disabled = isWatched;
+}
+
+workflowRunsPinBtn.addEventListener('click', async () => {
+    if (!currentWorkflowRuns?.length || !currentPRContext) return;
+    const latestRun = currentWorkflowRuns[0];
+    const runUrl = `https://github.com/${currentPRContext.owner}/${currentPRContext.repo}/actions/runs/${latestRun.runId}`;
+    workflowRunsPinBtn.disabled = true;
+    workflowRunsPinBtn.textContent = 'Adding…';
+    const r = await window.api.startWatching({ url: runUrl, repeatTotal: 1, source: 'manual' });
+    if (r.error) {
+        workflowRunsPinBtn.textContent = 'Error';
+        setTimeout(() => updatePinBtnState(), 2000);
+        return;
+    }
+    if (r.started) {
+        if (r.status === 'completed') {
+            addRunCard(r.runId, r.name, 'completed', r.conclusion, r.url, 1, 1, [r.conclusion], 'manual');
+            applyCompletedState(r.runId, { repeatTotal: 1, failed: r.failed, failedTests: r.failedTests });
+        } else {
+            addRunCard(r.runId, r.name, r.status, null, r.url, 1, 1, [], 'manual');
+        }
+    }
+    updatePinBtnState();
 });
 
 workflowRepeatInput.addEventListener('input', () => {
@@ -370,6 +517,32 @@ workflowRunsRerunBtn.addEventListener('click', async () => {
     }
     pendingRepeatTotals.set(runId, repeatTotal);
     workflowRunsRerunBtn.textContent = 'Waiting…';
+
+    // Persist so placeholders survive a manual refresh
+    const existingCount = currentWorkflowRuns.length;
+    inMemoryPendingRerun = {
+        owner: currentPRContext.owner,
+        repo: currentPRContext.repo,
+        runId,
+        fromAttempt: existingCount,
+        total: repeatTotal,
+    };
+    window.api.savePendingRerun(inMemoryPendingRerun);
+
+    // Inject placeholder rows for all upcoming runs so the user sees them immediately
+    for (let i = 1; i <= repeatTotal; i++) {
+        const attemptLabel = `#${existingCount + i}`;
+        const placeholder = document.createElement('div');
+        placeholder.className = 'pr-detail-run placeholder';
+        placeholder.dataset.placeholder = 'true';
+        placeholder.innerHTML = `
+            <span class="status-dot idle"></span>
+            <span class="pr-detail-run-name">${escapeHtml(attemptLabel)}</span>
+            <span class="pr-detail-run-status">Queued</span>
+            <div class="pr-detail-run-actions"></div>
+        `;
+        workflowRunsList.prepend(placeholder);
+    }
 });
 
 window.api.onWorkflowRunAppeared(async ({ owner, repo, runId }) => {

@@ -254,6 +254,15 @@ async function rerunRunDirect(owner, repo, runId, { getToken }) {
     }
 }
 
+async function cancelRunDirect(owner, repo, runId, { getToken }) {
+    try {
+        await cancelRun(owner, repo, runId, getToken());
+        return { cancelled: true };
+    } catch (err) {
+        return { error: err.message };
+    }
+}
+
 async function watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, poller }) {
     try {
         await rerunWorkflow(owner, repo, runId, getToken());
@@ -366,6 +375,7 @@ module.exports = {
     fetchRunAttemptsHandler,
     fetchPRReviewsHandler,
     rerunRunDirect,
+    cancelRunDirect,
     watchWorkflowRerun,
     resumeRuns,
     pinWorkflow,

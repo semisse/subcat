@@ -62,6 +62,18 @@ function migrate(db) {
     try {
         db.exec(`ALTER TABLE runs ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`);
     } catch (_) { /* column already exists */ }
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS pending_reruns (
+            id TEXT PRIMARY KEY,
+            owner TEXT NOT NULL,
+            repo TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            from_attempt INTEGER NOT NULL,
+            total INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        );
+    `);
 }
 
 function addRun({ id, currentRunId, owner, repo, workflowId, name, url, repeatTotal, runNumber, source = 'manual' }) {
@@ -155,4 +167,22 @@ function removePinnedWorkflow(id) {
     getDb().prepare(`DELETE FROM pinned_workflows WHERE id = ?`).run(id);
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow };
+function savePendingRerun({ owner, repo, runId, fromAttempt, total }) {
+    const id = `${owner}/${repo}/${runId}`;
+    getDb().prepare(`
+        INSERT OR REPLACE INTO pending_reruns (id, owner, repo, run_id, from_attempt, total, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, owner, repo, runId, fromAttempt, total, new Date().toISOString());
+}
+
+function getPendingRerun({ owner, repo, runId }) {
+    const id = `${owner}/${repo}/${runId}`;
+    return getDb().prepare(`SELECT * FROM pending_reruns WHERE id = ?`).get(id) ?? null;
+}
+
+function deletePendingRerun({ owner, repo, runId }) {
+    const id = `${owner}/${repo}/${runId}`;
+    getDb().prepare(`DELETE FROM pending_reruns WHERE id = ?`).run(id);
+}
+
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun };

@@ -407,6 +407,7 @@
 
         .status-dot.success { background: #2ecc71; }
         .status-dot.failure, .status-dot.cancelled, .status-dot.timed_out { background: #e74c3c; }
+        .status-dot.idle { background: #555; }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
@@ -754,6 +755,10 @@
 
         .pr-detail-run:last-child { border-bottom: none; }
 
+        .pr-detail-run.placeholder {
+            opacity: 0.45;
+        }
+
         .pr-detail-run.drillable {
             cursor: pointer;
             -webkit-app-region: no-drag;
@@ -845,6 +850,57 @@
             color: #c4b5fd;
         }
 
+        .workflow-pin-btn {
+            padding: 4px 10px;
+            border: 1px solid #1d4ed8;
+            border-radius: 6px;
+            background: none;
+            color: #60a5fa;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .workflow-pin-btn:hover {
+            background: rgba(29, 78, 216, 0.2);
+            border-color: #60a5fa;
+            color: #93c5fd;
+        }
+
+        .workflow-pin-btn.pinned {
+            border-color: #2563eb;
+            background: rgba(29, 78, 216, 0.25);
+            color: #93c5fd;
+        }
+
+        .workflow-pin-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .workflow-cancel-all-btn {
+            padding: 4px 10px;
+            border: 1px solid #7f1d1d;
+            border-radius: 6px;
+            background: none;
+            color: #f87171;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        .workflow-cancel-all-btn:hover {
+            background: rgba(127, 29, 29, 0.25);
+            border-color: #f87171;
+            color: #fca5a5;
+        }
+
+        .workflow-cancel-all-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .pr-detail-run-name {
             font-size: 12px;
             color: #e0e0e0;
@@ -895,6 +951,22 @@
         }
 
         .pr-detail-run-actions .watch-run-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pr-detail-run-actions .wf-cancel-run-btn {
+            border-color: #7f1d1d;
+            color: #f87171;
+        }
+
+        .pr-detail-run-actions .wf-cancel-run-btn:hover {
+            background: rgba(127, 29, 29, 0.25);
+            border-color: #f87171;
+            color: #fca5a5;
+        }
+
+        .pr-detail-run-actions .wf-cancel-run-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
@@ -999,6 +1071,8 @@
                     <input type="number" id="workflowRepeatInput" value="1" min="1" max="100" title="Number of reruns">
                 </div>
                 <button class="workflow-rerun-btn" id="workflowRunsRerunBtn" style="-webkit-app-region:no-drag;">↩ Rerun</button>
+                <button class="workflow-cancel-all-btn" id="workflowRunsCancelAllBtn" style="-webkit-app-region:no-drag;display:none;">Cancel all</button>
+                <button class="workflow-pin-btn" id="workflowRunsPinBtn" style="-webkit-app-region:no-drag;">⊕ Watch</button>
                 <button class="workflow-report-btn" id="workflowRunsReportBtn" style="-webkit-app-region:no-drag;">Report</button>
             </div>
         </div>

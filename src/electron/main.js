@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { createTray } = require('./tray');
 
 const db = require('../../src/db');
 const PollManager = require('../../src/core/poller');
@@ -15,9 +14,6 @@ const ipcRuns = require('./ipc/runs');
 const ipcReports = require('./ipc/reports');
 
 app.setName('SubCat');
-
-// True menu bar app — no Dock icon, no cmd+tab appearance
-if (process.platform === 'darwin') app.setActivationPolicy('accessory');
 
 app.setAboutPanelOptions({
     applicationName: 'SubCat',
@@ -39,8 +35,6 @@ const poller = new PollManager(db);
 
 let mainWindow;
 let loginWindow;
-// tray is kept alive by reference to prevent GC
-let _tray = null; // eslint-disable-line no-unused-vars
 let currentUser = null;
 
 const appIcon = nativeImage.createFromPath(path.join(__dirname, '../../assets', 'Icon-iOS-Default-1024x1024@1x.png'));
@@ -65,13 +59,7 @@ function createLoginWindow() {
 function createMainWindow() {
     mainWindow = new BrowserWindow({ width: 560, height: 680, resizable: true, ...windowPrefs });
     mainWindow.loadFile(path.join(__dirname, '../../index.html'));
-    // Hide instead of close so the app stays alive in the tray
-    mainWindow.on('close', (e) => {
-        if (!app.isQuitting) {
-            e.preventDefault();
-            mainWindow.hide();
-        }
-    });
+    mainWindow.on('closed', () => { mainWindow = null; });
 }
 
 const getWindow = () => mainWindow;
@@ -88,10 +76,6 @@ app.whenReady().then(async () => {
     app.dock?.setIcon(appIcon);
 
     buildMenu();
-
-    // Tray must be created before any window so the app doesn't quit
-    // when windows are hidden
-    _tray = createTray({ getWindow, poller });
 
     const token = storage.loadToken();
     if (token) {
@@ -165,10 +149,9 @@ function buildMenu() {
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-// App lives in the tray — do not quit when all windows are hidden/closed
-app.on('window-all-closed', () => { /* stay alive */ });
-
-app.on('before-quit', () => { app.isQuitting = true; });
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+});
 
 // ─── Auto-update ──────────────────────────────────────────────────────────────
 
@@ -192,7 +175,15 @@ if (process.env.NODE_ENV !== 'development') {
 }
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createLoginWindow();
+    if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+    } else if (loginWindow) {
+        loginWindow.show();
+        loginWindow.focus();
+    } else {
+        createLoginWindow();
+    }
 });
 
 // ─── IPC: auth, runs, reports ─────────────────────────────────────────────────

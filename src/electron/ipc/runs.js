@@ -1,6 +1,18 @@
 const { ipcMain, dialog } = require('electron');
 const runs = require('../../core/runs');
 
+// Wrapper to avoid "Attempted to register a second handler" errors on hot-reload.
+// Re-registers the handler atomically so there's no gap where no handler exists.
+function handle(channel, handler) {
+    try {
+        ipcMain.handle(channel, handler);
+    } catch {
+        // Already registered (hot-reload): replace in place without removing first
+        ipcMain.removeHandler(channel);
+        ipcMain.handle(channel, handler);
+    }
+}
+
 function register({ db, poller, storage, getWindow, getUser }) {
     const getToken = () => storage.loadToken() || undefined;
 
@@ -8,28 +20,28 @@ function register({ db, poller, storage, getWindow, getUser }) {
         getWindow()?.webContents.send('workflow-run-appeared', { owner, repo, runId });
     });
 
-    ipcMain.handle('fetch-user-prs', async () => {
+    handle('fetch-user-prs', async () => {
         const user = getUser();
         return runs.fetchUserPRsHandler(user?.login, { getToken });
     });
 
-    ipcMain.handle('fetch-pr-runs', async (event, url) => {
+    handle('fetch-pr-runs', async (event, url) => {
         return runs.fetchPRRunsHandler(url, { getToken });
     });
 
-    ipcMain.handle('fetch-run-attempts', async (event, opts) => {
+    handle('fetch-run-attempts', async (event, opts) => {
         return runs.fetchRunAttemptsHandler(opts, { getToken });
     });
 
-    ipcMain.handle('fetch-pr-reviews', async (event, opts) => {
+    handle('fetch-pr-reviews', async (event, opts) => {
         return runs.fetchPRReviewsHandler(opts, { getToken });
     });
 
-    ipcMain.handle('start-watching', async (event, opts) => {
+    handle('start-watching', async (event, opts) => {
         return runs.startWatching(opts, { db, poller, getToken });
     });
 
-    ipcMain.handle('confirm-dialog', async (event, { title, message }) => {
+    handle('confirm-dialog', async (event, { title, message }) => {
         const { response } = await dialog.showMessageBox(getWindow(), {
             type: 'warning',
             buttons: ['Stop & Remove', 'Cancel'],
@@ -42,31 +54,35 @@ function register({ db, poller, storage, getWindow, getUser }) {
         return response === 0;
     });
 
-    ipcMain.handle('stop-watching', async (event, runId) => {
+    handle('stop-watching', async (event, runId) => {
         return runs.stopWatching(runId, { poller });
     });
 
-    ipcMain.handle('rerun-run', async (event, runId) => {
+    handle('rerun-run', async (event, runId) => {
         return runs.rerunRun(runId, { db, poller, getToken });
     });
 
-    ipcMain.handle('rerun-failed-run', async (event, runId) => {
+    handle('rerun-failed-run', async (event, runId) => {
         return runs.rerunFailedRun(runId, { db, poller, getToken });
     });
 
-    ipcMain.handle('cancel-run', async (event, runId) => {
+    handle('cancel-run', async (event, runId) => {
         return runs.cancelRunHandler(runId, { db, poller, getToken });
     });
 
-    ipcMain.handle('rerun-run-direct', async (event, { owner, repo, runId }) => {
+    handle('rerun-run-direct', async (event, { owner, repo, runId }) => {
         return runs.rerunRunDirect(owner, repo, runId, { getToken });
     });
 
-    ipcMain.handle('watch-workflow-rerun', async (event, { owner, repo, runId, previousAttemptCount }) => {
+    handle('cancel-run-direct', async (event, { owner, repo, runId }) => {
+        return runs.cancelRunDirect(owner, repo, runId, { getToken });
+    });
+
+    handle('watch-workflow-rerun', async (event, { owner, repo, runId, previousAttemptCount }) => {
         return runs.watchWorkflowRerun({ owner, repo, runId, previousAttemptCount }, { getToken, poller });
     });
 
-    ipcMain.handle('pin-workflow', async (event, url) => {
+    handle('pin-workflow', async (event, url) => {
         return runs.pinWorkflow({ url }, {
             db,
             getToken,
@@ -74,8 +90,20 @@ function register({ db, poller, storage, getWindow, getUser }) {
         });
     });
 
-    ipcMain.handle('unpin-workflow', async (event, id) => {
+    handle('unpin-workflow', async (event, id) => {
         return runs.unpinWorkflow(id, { db });
+    });
+
+    handle('save-pending-rerun', async (event, opts) => {
+        db.savePendingRerun(opts);
+    });
+
+    handle('get-pending-rerun', async (event, opts) => {
+        return db.getPendingRerun(opts);
+    });
+
+    handle('delete-pending-rerun', async (event, opts) => {
+        db.deletePendingRerun(opts);
     });
 }
 

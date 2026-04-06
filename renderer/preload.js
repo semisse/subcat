@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
     saveReport: (runId) => ipcRenderer.invoke('save-report', runId),
     savePRWorkflowReport: (data) => ipcRenderer.invoke('save-pr-workflow-report', data),
     rerunRunDirect: (opts) => ipcRenderer.invoke('rerun-run-direct', opts),
+    cancelRunDirect: (opts) => ipcRenderer.invoke('cancel-run-direct', opts),
     watchWorkflowRerun: (opts) => ipcRenderer.invoke('watch-workflow-rerun', opts),
     onWorkflowRunAppeared: (callback) => ipcRenderer.on('workflow-run-appeared', (_, data) => callback(data)),
     pinWorkflow: (url) => ipcRenderer.invoke('pin-workflow', url),
@@ -34,5 +35,8 @@ contextBridge.exposeInMainWorld('api', {
     authLogout: () => ipcRenderer.invoke('auth-logout'),
     onAuthLoggedIn: (callback) => ipcRenderer.on('auth-logged-in', (_, data) => callback(data)),
     onAuthError: (callback) => ipcRenderer.on('auth-error', (_, data) => callback(data)),
-    onOpenNewWatch: (callback) => ipcRenderer.on('open-new-watch', () => callback())
+    onOpenNewWatch: (callback) => ipcRenderer.on('open-new-watch', () => callback()),
+    savePendingRerun: (opts) => ipcRenderer.invoke('save-pending-rerun', opts),
+    getPendingRerun: (opts) => ipcRenderer.invoke('get-pending-rerun', opts),
+    deletePendingRerun: (opts) => ipcRenderer.invoke('delete-pending-rerun', opts)
 });
