@@ -236,6 +236,16 @@ let currentWorkflowRuns = null;
 let workflowRunsBackTarget = 'pr-detail'; // 'pr-detail' | 'main'
 let level3PollInterval = null;
 let inMemoryPendingRerun = null; // { owner, repo, runId, fromAttempt, total }
+const failedOnlyAttempts = new Map(); // runId → Set<attemptNumber>
+
+function markFailedOnlyAttempt(runId, attemptNum) {
+    if (!failedOnlyAttempts.has(runId)) failedOnlyAttempts.set(runId, new Set());
+    failedOnlyAttempts.get(runId).add(attemptNum);
+}
+
+function isFailedOnlyAttempt(runId, attemptNum) {
+    return failedOnlyAttempts.get(runId)?.has(attemptNum) ?? false;
+}
 
 function clearLevel3Poll() {
     if (level3PollInterval) {
@@ -283,18 +293,20 @@ async function openPRDetail(pr) {
     }
 }
 
-function createRunItem(run, owner, repo) {
+function createRunItem(run, owner, repo, { isLatestFailed = false } = {}) {
     const dotClass = run.status === 'completed' ? (run.conclusion ?? '') : run.status;
     const isActive = run.status !== 'completed';
+    const failedOnly = isFailedOnlyAttempt(run.runId, run.runAttempt);
     const item = document.createElement('div');
     item.className = 'pr-detail-run';
     item.dataset.attempt = run.runAttempt;
     item.innerHTML = `
         <span class="status-dot ${escapeHtml(dotClass)}"></span>
-        <span class="pr-detail-run-name">#${run.runAttempt}</span>
+        <span class="pr-detail-run-name">#${run.runAttempt}${failedOnly ? ' <span class="failed-only-badge">failed jobs only</span>' : ''}</span>
         <span class="pr-detail-run-status">${escapeHtml(formatStatus(run.status, run.conclusion))}</span>
         <div class="pr-detail-run-actions">
-            ${isActive ? '<button class="wf-cancel-run-btn">✕</button>' : ''}
+            ${isActive ? '<button class="wf-cancel-run-btn">Cancel Run</button>' : ''}
+            ${isLatestFailed ? '<button class="wf-rerun-failed-btn">↩ Rerun Failed Only</button>' : ''}
             <button class="open-run-btn">↗</button>
         </div>
     `;
@@ -305,6 +317,21 @@ function createRunItem(run, owner, repo) {
             btn.disabled = true;
             await window.api.cancelRunDirect({ owner, repo, runId: run.runId });
             btn.remove();
+        });
+    }
+    if (isLatestFailed) {
+        item.querySelector('.wf-rerun-failed-btn').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            btn.textContent = 'Starting…';
+            const result = await window.api.rerunFailedJobsDirect({ owner, repo, runId: run.runId });
+            if (result.error) {
+                btn.disabled = false;
+                btn.textContent = '↩ Rerun Failed Only';
+            } else {
+                markFailedOnlyAttempt(run.runId, currentWorkflowRuns.length + 1);
+                btn.remove();
+            }
         });
     }
     return item;
@@ -341,6 +368,12 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     workflowRunsCancelAllBtn.style.display = hasActiveRun ? '' : 'none';
     workflowRunsRerunBtn.textContent = '↩ Rerun';
 
+    const latestFailedAttempt = !hasActiveRun
+        ? result.runs
+            .filter(r => r.status === 'completed' && r.conclusion === 'failure')
+            .sort((a, b) => b.runAttempt - a.runAttempt)[0]?.runAttempt
+        : null;
+
     if (isRefresh) {
         // Remove stale placeholders; will be re-injected below with the correct count
         workflowRunsList.querySelectorAll('[data-placeholder]').forEach(el => el.remove());
@@ -367,11 +400,36 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
                 workflowRunsList.querySelector(`[data-attempt="${run.runAttempt}"] .wf-cancel-run-btn`)?.remove();
             }
         }
+
+        // Sync "Rerun Failed Only" button: remove from all rows, re-add only to latest failed
+        workflowRunsList.querySelectorAll('.wf-rerun-failed-btn').forEach(btn => btn.remove());
+        if (latestFailedAttempt != null) {
+            const targetRow = workflowRunsList.querySelector(`[data-attempt="${latestFailedAttempt}"]`);
+            const targetRun = result.runs.find(r => r.runAttempt === latestFailedAttempt);
+            if (targetRow && targetRun && !targetRow.querySelector('.wf-rerun-failed-btn')) {
+                const btn = document.createElement('button');
+                btn.className = 'wf-rerun-failed-btn';
+                btn.textContent = '↩ Rerun Failed Only';
+                btn.addEventListener('click', async (e) => {
+                    btn.disabled = true;
+                    btn.textContent = 'Starting…';
+                    const result2 = await window.api.rerunFailedJobsDirect({ owner, repo, runId: targetRun.runId });
+                    if (result2.error) {
+                        btn.disabled = false;
+                        btn.textContent = '↩ Rerun Failed Only';
+                    } else {
+                        markFailedOnlyAttempt(targetRun.runId, currentWorkflowRuns.length + 1);
+                        btn.remove();
+                    }
+                });
+                targetRow.querySelector('.pr-detail-run-actions').prepend(btn);
+            }
+        }
     } else {
         workflowRunsList.innerHTML = '';
         workflowRepeatInput.value = '1';
         for (const run of result.runs) {
-            workflowRunsList.appendChild(createRunItem(run, owner, repo));
+            workflowRunsList.appendChild(createRunItem(run, owner, repo, { isLatestFailed: run.runAttempt === latestFailedAttempt }));
         }
     }
 
@@ -393,16 +451,18 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
         } else {
             const missingCount = expectedTotal - result.runs.length;
             for (let i = 1; i <= missingCount; i++) {
-                const attemptLabel = `#${result.runs.length + i}`;
+                const attemptNum = result.runs.length + i;
+                const attemptLabel = `#${attemptNum}`;
+                const isFailedOnly = isFailedOnlyAttempt(workflow.runId, attemptNum);
                 const placeholder = document.createElement('div');
                 placeholder.className = 'pr-detail-run placeholder';
                 placeholder.dataset.placeholder = 'true';
                 placeholder.innerHTML = `
                     <span class="status-dot idle"></span>
-                    <span class="pr-detail-run-name">${escapeHtml(attemptLabel)}</span>
+                    <span class="pr-detail-run-name">${escapeHtml(attemptLabel)}${isFailedOnly ? ' <span class="failed-only-badge">failed jobs only</span>' : ''}</span>
                     <span class="pr-detail-run-status">Queued</span>
                     <div class="pr-detail-run-actions">
-                        <button class="wf-cancel-run-btn">✕</button>
+                        <button class="wf-cancel-run-btn">Cancel Run</button>
                     </div>
                 `;
                 placeholder.querySelector('.wf-cancel-run-btn').addEventListener('click', async (e) => {
@@ -994,7 +1054,7 @@ function applyCompletedState(runId, { failed, failedTests }) {
         const rerunBtn = actions.querySelector('.rerun-btn');
         const rerunFailedBtn = document.createElement('button');
         rerunFailedBtn.className = 'rerun-failed-btn';
-        rerunFailedBtn.textContent = '↩ Rerun Failed';
+        rerunFailedBtn.textContent = '↩ Rerun Failed Only';
         rerunFailedBtn.addEventListener('click', async () => {
             rerunFailedBtn.disabled = true;
             rerunFailedBtn.textContent = 'Starting…';
@@ -1013,7 +1073,7 @@ function applyCompletedState(runId, { failed, failedTests }) {
                 card.querySelector('.status-text').textContent = 'failure';
                 card.dataset.active = 'false';
                 rerunFailedBtn.disabled = false;
-                rerunFailedBtn.textContent = '↩ Rerun Failed';
+                rerunFailedBtn.textContent = '↩ Rerun Failed Only';
             } else {
                 rerunFailedBtn.remove();
             }

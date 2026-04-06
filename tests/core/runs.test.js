@@ -4,6 +4,7 @@ const {
     rerunRun, rerunFailedRun, stopWatching, cancelRunHandler, resumeRuns,
     watchWorkflowRerun, fetchRunAttemptsHandler,
     pinWorkflow, unpinWorkflow, resumePinnedWorkflows,
+    rerunFailedJobsDirect, cancelRunDirect,
 } = require('../../src/core/runs');
 
 function makeDb(overrides = {}) {
@@ -340,6 +341,40 @@ describe('unpinWorkflow', () => {
         const result = unpinWorkflow('owner/repo/ci.yml', { db });
         expect(db.removePinnedWorkflow).toHaveBeenCalledWith('owner/repo/ci.yml');
         expect(result).toEqual({ unpinned: true });
+    });
+});
+
+// ─── rerunFailedJobsDirect ────────────────────────────────────────────────────
+
+describe('rerunFailedJobsDirect', () => {
+    test('calls rerunFailedJobs with correct args and returns started', async () => {
+        github.rerunFailedJobs.mockResolvedValue(undefined);
+        const result = await rerunFailedJobsDirect('owner', 'repo', '42', { getToken: () => 'tok' });
+        expect(github.rerunFailedJobs).toHaveBeenCalledWith('owner', 'repo', '42', 'tok');
+        expect(result).toEqual({ started: true });
+    });
+
+    test('returns error when rerunFailedJobs throws', async () => {
+        github.rerunFailedJobs.mockRejectedValue(new Error('API error'));
+        const result = await rerunFailedJobsDirect('owner', 'repo', '42', { getToken: () => 'tok' });
+        expect(result).toEqual({ error: 'API error' });
+    });
+});
+
+// ─── cancelRunDirect ──────────────────────────────────────────────────────────
+
+describe('cancelRunDirect', () => {
+    test('calls cancelRun with correct args and returns cancelled', async () => {
+        github.cancelRun.mockResolvedValue(undefined);
+        const result = await cancelRunDirect('owner', 'repo', '42', { getToken: () => 'tok' });
+        expect(github.cancelRun).toHaveBeenCalledWith('owner', 'repo', '42', 'tok');
+        expect(result).toEqual({ cancelled: true });
+    });
+
+    test('returns error when cancelRun throws', async () => {
+        github.cancelRun.mockRejectedValue(new Error('not found'));
+        const result = await cancelRunDirect('owner', 'repo', '42', { getToken: () => 'tok' });
+        expect(result).toEqual({ error: 'not found' });
     });
 });
 

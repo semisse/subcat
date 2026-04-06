@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
     saveReport: (runId) => ipcRenderer.invoke('save-report', runId),
     savePRWorkflowReport: (data) => ipcRenderer.invoke('save-pr-workflow-report', data),
     rerunRunDirect: (opts) => ipcRenderer.invoke('rerun-run-direct', opts),
+    rerunFailedJobsDirect: (opts) => ipcRenderer.invoke('rerun-failed-jobs-direct', opts),
     cancelRunDirect: (opts) => ipcRenderer.invoke('cancel-run-direct', opts),
     watchWorkflowRerun: (opts) => ipcRenderer.invoke('watch-workflow-rerun', opts),
     onWorkflowRunAppeared: (callback) => ipcRenderer.on('workflow-run-appeared', (_, data) => callback(data)),

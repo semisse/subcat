@@ -74,6 +74,10 @@ function register({ db, poller, storage, getWindow, getUser }) {
         return runs.rerunRunDirect(owner, repo, runId, { getToken });
     });
 
+    handle('rerun-failed-jobs-direct', async (event, { owner, repo, runId }) => {
+        return runs.rerunFailedJobsDirect(owner, repo, runId, { getToken });
+    });
+
     handle('cancel-run-direct', async (event, { owner, repo, runId }) => {
         return runs.cancelRunDirect(owner, repo, runId, { getToken });
     });

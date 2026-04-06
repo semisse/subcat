@@ -254,6 +254,15 @@ async function rerunRunDirect(owner, repo, runId, { getToken }) {
     }
 }
 
+async function rerunFailedJobsDirect(owner, repo, runId, { getToken }) {
+    try {
+        await rerunFailedJobs(owner, repo, runId, getToken());
+        return { started: true };
+    } catch (err) {
+        return { error: err.message };
+    }
+}
+
 async function cancelRunDirect(owner, repo, runId, { getToken }) {
     try {
         await cancelRun(owner, repo, runId, getToken());
@@ -375,6 +384,7 @@ module.exports = {
     fetchRunAttemptsHandler,
     fetchPRReviewsHandler,
     rerunRunDirect,
+    rerunFailedJobsDirect,
     cancelRunDirect,
     watchWorkflowRerun,
     resumeRuns,

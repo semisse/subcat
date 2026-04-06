@@ -187,6 +187,39 @@ describe('clearRunResults', () => {
     });
 });
 
+// ─── pending_reruns ───────────────────────────────────────────────────────────
+
+describe('savePendingRerun / getPendingRerun / deletePendingRerun', () => {
+    const RERUN = { owner: 'owner', repo: 'repo', runId: '99', fromAttempt: 2, total: 5 };
+
+    test('saves and retrieves a pending rerun', () => {
+        db.savePendingRerun(RERUN);
+        const result = db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: '99' });
+        expect(result).toMatchObject({ owner: 'owner', repo: 'repo', run_id: '99', from_attempt: 2, total: 5 });
+    });
+
+    test('returns null when no pending rerun exists', () => {
+        expect(db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: 'nonexistent' })).toBeNull();
+    });
+
+    test('upserts on duplicate id', () => {
+        db.savePendingRerun(RERUN);
+        db.savePendingRerun({ ...RERUN, fromAttempt: 3 });
+        const result = db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: '99' });
+        expect(result.from_attempt).toBe(3);
+    });
+
+    test('deletes a pending rerun', () => {
+        db.savePendingRerun(RERUN);
+        db.deletePendingRerun({ owner: 'owner', repo: 'repo', runId: '99' });
+        expect(db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: '99' })).toBeNull();
+    });
+
+    test('delete is a no-op when entry does not exist', () => {
+        expect(() => db.deletePendingRerun({ owner: 'owner', repo: 'repo', runId: 'ghost' })).not.toThrow();
+    });
+});
+
 // ─── getReport ────────────────────────────────────────────────────────────────
 
 describe('getReport', () => {

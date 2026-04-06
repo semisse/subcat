@@ -971,6 +971,33 @@
             cursor: not-allowed;
         }
 
+        .failed-only-badge {
+            font-size: 10px;
+            color: #a78bfa;
+            border: 1px solid #533483;
+            border-radius: 4px;
+            padding: 1px 5px;
+            margin-left: 4px;
+            vertical-align: middle;
+            font-weight: normal;
+        }
+
+        .pr-detail-run-actions .wf-rerun-failed-btn {
+            border-color: #533483;
+            color: #a78bfa;
+        }
+
+        .pr-detail-run-actions .wf-rerun-failed-btn:hover {
+            background: rgba(83, 52, 131, 0.2);
+            border-color: #a78bfa;
+            color: #c4b5fd;
+        }
+
+        .pr-detail-run-actions .wf-rerun-failed-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .pr-detail-empty, .pr-detail-loading {
             padding: 12px;
             font-size: 12px;
