@@ -26,7 +26,7 @@ Download the latest `.dmg` from [Releases](../../releases), open it, and drag Su
 
 - Watch multiple runs simultaneously
 - Repeat a run N times to catch flaky tests — get a pass/failure summary at the end
-- Export results to CSV
+- Export results to Markdown
 - Runs persist across restarts — pick up where you left off
 - Token encrypted via macOS Keychain (`safeStorage`)
 
