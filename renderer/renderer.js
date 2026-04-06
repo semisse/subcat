@@ -356,10 +356,18 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     workflowRunsTitle.textContent = workflow.name;
 
     if (!isRefresh) {
-        workflowRunsList.innerHTML = '<div class="pr-detail-loading">Loading runs…</div>';
+        workflowRunsList.style.display = 'none';
+        workflowRunsList.innerHTML = '';
+        loadingText.textContent = 'Loading…';
+        loadingState.classList.add('visible');
     }
 
     const result = await window.api.fetchRunAttempts({ owner, repo, runId: workflow.runId });
+
+    if (!isRefresh) {
+        loadingState.classList.remove('visible');
+        workflowRunsList.style.display = 'block';
+    }
 
     if (result.error || !result.runs?.length) {
         workflowRunsList.innerHTML = '<div class="pr-detail-empty">No runs found.</div>';
