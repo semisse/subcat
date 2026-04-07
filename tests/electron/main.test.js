@@ -56,6 +56,7 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         pollForToken: jest.fn(),
     }));
     jest.doMock('../../src/electron/storage', () => ({
+        initialize: jest.fn().mockResolvedValue(undefined),
         loadToken: jest.fn(() => token),
         storeToken: jest.fn(),
         clearToken: jest.fn(),
