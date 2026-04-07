@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' https://avatars.githubusercontent.com">
     <title>SubCat</title>
+    <link rel="icon" href="assets/Icon-iOS-Default-1024x1024@1x.png">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -38,7 +39,7 @@
         }
 
         .header-title img {
-            width: 36px;
+            width: 34px;
         }
 
         .header-title h1 {
@@ -73,6 +74,7 @@
         }
 
         .app-version {
+            margin-top: 3px;
             font-size: 10px;
             color: #444;
             cursor: pointer;
@@ -109,6 +111,7 @@
         }
 
         .input-section {
+            padding-top: 12px;
             -webkit-app-region: no-drag;
         }
 
@@ -276,6 +279,9 @@
             margin-top: 4px;
         }
 
+        .run-repeat .count-pass { color: #2ecc71; }
+        .run-repeat .count-fail { color: #e74c3c; }
+
         .run-results {
             display: inline-flex;
             gap: 6px;
@@ -334,6 +340,20 @@
             flex: 1;
         }
 
+        .runs-section {
+            margin-bottom: 6px;
+        }
+
+        .runs-section-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #444;
+            margin-bottom: 6px;
+            padding-left: 2px;
+        }
+
         .run-card {
             background: #16213e;
             border: 1px solid #333;
@@ -387,6 +407,7 @@
 
         .status-dot.success { background: #2ecc71; }
         .status-dot.failure, .status-dot.cancelled, .status-dot.timed_out { background: #e74c3c; }
+        .status-dot.idle { background: #555; }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
@@ -462,14 +483,14 @@
         }
 
         .run-actions .report-btn {
-            border-color: #533483;
-            color: #a78bfa;
+            border-color: transparent;
+            color: #555;
         }
 
         .run-actions .report-btn:hover {
-            background: rgba(83, 52, 131, 0.2);
-            border-color: #a78bfa;
-            color: #c4b5fd;
+            border-color: transparent;
+            background: none;
+            color: #888;
         }
 
         .run-actions .rerun-failed-btn {
@@ -539,6 +560,7 @@
 
         .loading-state.visible {
             display: flex;
+            flex: 1;
             animation: fadeIn 0.25s ease forwards;
         }
 
@@ -569,6 +591,426 @@
             to { opacity: 0; }
         }
 
+        .pr-picker {
+            margin-bottom: 10px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .pr-picker-label {
+            padding: 7px 12px 5px;
+            font-size: 11px;
+            color: #555;
+            border-bottom: 1px solid #222;
+        }
+
+        .pr-picker-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid #222;
+        }
+
+        .pr-picker-item:last-child {
+            border-bottom: none;
+        }
+
+        .pr-picker-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .pr-picker-item.selected {
+            background: rgba(83, 52, 131, 0.2);
+        }
+
+        .pr-picker-name {
+            flex: 1;
+            font-size: 12px;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pr-picker-status {
+            font-size: 11px;
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .my-prs-section {
+            flex-shrink: 0;
+        }
+
+        .my-prs-header {
+            margin-bottom: 6px;
+        }
+
+        .my-prs-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: #bbb;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            -webkit-app-region: no-drag;
+        }
+
+        .back-btn:hover { color: #fff; }
+
+        .pr-detail-title {
+            font-size: 12px;
+            color: #ccc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 440px;
+        }
+
+        .my-prs-list {
+            max-height: 144px;
+            overflow-y: auto;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .my-prs-list.scrollable {
+            overflow-y: auto;
+        }
+
+        .my-pr-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #1e1e30;
+            transition: background 0.15s;
+            -webkit-app-region: no-drag;
+        }
+
+        .my-pr-item:last-child { border-bottom: none; }
+
+        .my-pr-item:hover { background: rgba(255,255,255,0.04); }
+
+        .pr-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .my-pr-meta {
+            font-size: 10px;
+            color: #555;
+            margin-bottom: 2px;
+        }
+
+        .my-pr-title {
+            font-size: 12px;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pr-ci-badge {
+            flex-shrink: 0;
+        }
+
+        .pr-detail-list {
+            overflow-y: auto;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            flex: 1;
+        }
+
+        .pr-detail-run {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #1e1e30;
+        }
+
+        .pr-detail-run:last-child { border-bottom: none; }
+
+        .pr-detail-run.placeholder {
+            opacity: 0.45;
+        }
+
+        .pr-detail-run.drillable {
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        .pr-detail-run.drillable:hover {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .pr-drill-chevron {
+            font-size: 14px;
+            color: #444;
+            flex-shrink: 0;
+            margin-left: 2px;
+        }
+
+        .pr-detail-run.drillable:hover .pr-drill-chevron {
+            color: #888;
+        }
+
+        .workflow-rerun-btn {
+            padding: 4px 10px;
+            border: none;
+            border-radius: 6px;
+            background: #238636;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            transition: background 0.2s;
+        }
+
+        .workflow-rerun-btn:hover {
+            background: #2ea043;
+        }
+
+        .workflow-rerun-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .wf-repeat-field {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 0 6px;
+            background: #16213e;
+        }
+
+        .wf-repeat-field .repeat-label {
+            color: #555;
+            font-size: 11px;
+        }
+
+        .wf-repeat-field input[type="number"] {
+            width: 32px;
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 11px;
+            padding: 4px 0;
+            margin: 0;
+            text-align: center;
+            -moz-appearance: textfield;
+        }
+
+        .wf-repeat-field input[type="number"]::-webkit-outer-spin-button,
+        .wf-repeat-field input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+        }
+
+        .workflow-report-btn {
+            padding: 4px 10px;
+            border: 1px solid #533483;
+            border-radius: 6px;
+            background: none;
+            color: #a78bfa;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        .workflow-report-btn:hover {
+            background: rgba(83, 52, 131, 0.2);
+            border-color: #a78bfa;
+            color: #c4b5fd;
+        }
+
+        .workflow-pin-btn {
+            padding: 4px 10px;
+            border: 1px solid #1d4ed8;
+            border-radius: 6px;
+            background: none;
+            color: #60a5fa;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .workflow-pin-btn:hover {
+            background: rgba(29, 78, 216, 0.2);
+            border-color: #60a5fa;
+            color: #93c5fd;
+        }
+
+        .workflow-pin-btn.pinned {
+            border-color: #2563eb;
+            background: rgba(29, 78, 216, 0.25);
+            color: #93c5fd;
+        }
+
+        .workflow-pin-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .workflow-cancel-all-btn {
+            padding: 4px 10px;
+            border: 1px solid #7f1d1d;
+            border-radius: 6px;
+            background: none;
+            color: #f87171;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-app-region: no-drag;
+        }
+
+        .workflow-cancel-all-btn:hover {
+            background: rgba(127, 29, 29, 0.25);
+            border-color: #f87171;
+            color: #fca5a5;
+        }
+
+        .workflow-cancel-all-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pr-detail-run-name {
+            font-size: 12px;
+            color: #e0e0e0;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pr-detail-run-status {
+            font-size: 11px;
+            color: #666;
+            flex-shrink: 0;
+        }
+
+        .pr-detail-run-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .pr-detail-run-actions button {
+            background: none;
+            border: 1px solid #444;
+            color: #aaa;
+            border-radius: 5px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s;
+            -webkit-app-region: no-drag;
+        }
+
+        .pr-detail-run-actions button:hover {
+            color: #fff;
+            border-color: #888;
+        }
+
+        .pr-detail-run-actions .watch-run-btn {
+            border-color: #533483;
+            color: #a78bfa;
+        }
+
+        .pr-detail-run-actions .watch-run-btn:hover {
+            background: rgba(83,52,131,0.2);
+            border-color: #a78bfa;
+            color: #c4b5fd;
+        }
+
+        .pr-detail-run-actions .watch-run-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pr-detail-run-actions .wf-cancel-run-btn {
+            border-color: #7f1d1d;
+            color: #f87171;
+        }
+
+        .pr-detail-run-actions .wf-cancel-run-btn:hover {
+            background: rgba(127, 29, 29, 0.25);
+            border-color: #f87171;
+            color: #fca5a5;
+        }
+
+        .pr-detail-run-actions .wf-cancel-run-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .failed-only-badge {
+            font-size: 10px;
+            color: #a78bfa;
+            border: 1px solid #533483;
+            border-radius: 4px;
+            padding: 1px 5px;
+            margin-left: 4px;
+            vertical-align: middle;
+            font-weight: normal;
+        }
+
+        .pr-detail-run-actions .wf-rerun-failed-btn {
+            border-color: #533483;
+            color: #a78bfa;
+        }
+
+        .pr-detail-run-actions .wf-rerun-failed-btn:hover {
+            background: rgba(83, 52, 131, 0.2);
+            border-color: #a78bfa;
+            color: #c4b5fd;
+        }
+
+        .pr-detail-run-actions .wf-rerun-failed-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pr-detail-empty, .pr-detail-loading {
+            padding: 12px;
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: #1e1e30;
+            margin: 12px 0;
+        }
+
         .error-msg {
             background: rgba(231, 76, 60, 0.15);
             border: 1px solid rgba(231, 76, 60, 0.3);
@@ -577,6 +1019,50 @@
             font-size: 12px;
             color: #e74c3c;
             margin-top: 10px;
+        }
+
+        .run-flakiness {
+            font-size: 11px;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        .run-flakiness.flakiness-stable { color: #2ecc71; }
+        .run-flakiness.flakiness-warn   { color: #f39c12; }
+        .run-flakiness.flakiness-bad    { color: #e74c3c; }
+
+        .run-card.pinned-card {
+            border-color: #2a3a5e;
+        }
+
+        .pinned-meta {
+            font-size: 11px;
+            color: #555;
+            margin-left: 4px;
+        }
+
+        .pr-review-approved { color: #2ecc71; }
+        .pr-review-changes  { color: #e74c3c; }
+        .pr-review-pending  { color: #666; }
+
+        .pr-loading-spinner {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border: 1.5px solid #333;
+            border-top-color: #666;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .run-actions .open-btn {
+            border-color: transparent;
+            color: #555;
+        }
+
+        .run-actions .open-btn:hover {
+            border-color: transparent;
+            background: none;
+            color: #aaa;
         }
     </style>
 </head>
@@ -595,21 +1081,67 @@
         </div>
     </div>
 
-    <div class="runs-list" id="runsList"></div>
+    <div class="my-prs-section" id="myPrsSection" style="display:none;">
+        <div class="my-prs-header">
+            <div class="my-prs-nav" id="myPrsNav">
+                <span class="section-label">My PRs</span>
+            </div>
+            <div class="my-prs-nav pr-detail-nav" id="prDetailNav" style="display:none;">
+                <button class="back-btn" id="prDetailBack">←</button>
+                <span class="pr-detail-title" id="prDetailTitle"></span>
+            </div>
+            <div class="my-prs-nav pr-detail-nav" id="workflowRunsNav" style="display:none;">
+                <button class="back-btn" id="workflowRunsBack">←</button>
+                <span class="pr-detail-title" id="workflowRunsTitle" style="flex:1;"></span>
+                <div class="wf-repeat-field" id="workflowRepeatField" style="-webkit-app-region:no-drag;">
+                    <span class="repeat-label">×</span>
+                    <input type="number" id="workflowRepeatInput" value="1" min="1" max="100" title="Number of reruns">
+                </div>
+                <button class="workflow-rerun-btn" id="workflowRunsRerunBtn" style="-webkit-app-region:no-drag;">↩ Rerun</button>
+                <button class="workflow-cancel-all-btn" id="workflowRunsCancelAllBtn" style="-webkit-app-region:no-drag;display:none;">Cancel all</button>
+                <button class="workflow-pin-btn" id="workflowRunsPinBtn" style="-webkit-app-region:no-drag;">⊕ Watch</button>
+                <button class="workflow-report-btn" id="workflowRunsReportBtn" style="-webkit-app-region:no-drag;">Report</button>
+            </div>
+        </div>
+        <div class="my-prs-list" id="myPrsList"></div>
+        <div class="pr-detail-list" id="prDetailList" style="display:none;"></div>
+        <div class="pr-detail-list" id="workflowRunsList" style="display:none;"></div>
+        <div class="section-divider"></div>
+    </div>
+
+    <div class="runs-list" id="runsList">
+        <div class="runs-section" id="sectionPinned" style="display:none;">
+            <div class="runs-section-label">Pinned</div>
+            <div id="sectionPinnedItems"></div>
+        </div>
+        <div class="runs-section" id="sectionMyPrs" style="display:none;">
+            <div class="runs-section-label">My PRs</div>
+            <div id="sectionMyPrsItems"></div>
+        </div>
+        <div class="runs-section" id="sectionRuns" style="display:none;">
+            <div class="runs-section-label">Runs</div>
+            <div id="sectionRunsItems"></div>
+        </div>
+        <div class="runs-section" id="sectionWorkflows" style="display:none;">
+            <div class="runs-section-label">Workflows</div>
+            <div id="sectionWorkflowsItems"></div>
+        </div>
+    </div>
     <div class="empty-state" id="emptyState">
         <img src="assets/noresults.png" alt="">
-        <span>No runs being watched.</span>
+        <span>Paste a PR or workflow URL to stop babysitting your CI.</span>
     </div>
     <div class="loading-state" id="loadingState">
         <img src="assets/subcat-jump.png" alt="">
-        <span>Refreshing…</span>
+        <span id="loadingText">Refreshing…</span>
     </div>
 
     <div class="input-section">
-        <button class="add-btn" id="addBtn">+ Watch Run</button>
+        <button class="add-btn" id="addBtn">+ Watch</button>
 
         <div class="url-form" id="urlForm" style="display:none;">
-            <input type="text" id="urlInput" placeholder="https://github.com/owner/repo/actions/runs/123456789" autofocus>
+            <input type="text" id="urlInput" placeholder="GitHub run, PR, or workflow URL" autofocus>
+            <div id="prPicker" class="pr-picker" style="display:none;"></div>
             <div class="url-form-actions">
                 <div class="repeat-field">
                     <span class="repeat-label">×</span>
@@ -623,6 +1155,6 @@
         <div id="errorContainer"></div>
     </div>
 
-    <script src="renderer.js"></script>
+    <script src="renderer/renderer.js"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@ jest.mock('electron', () => ({
 }));
 
 const https = require('https');
-const { fetchUser } = require('../auth');
+const { fetchUser } = require('../../src/core/auth');
 
 function mockResponse(statusCode, body) {
     const EventEmitter = require('events');
