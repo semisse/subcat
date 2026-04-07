@@ -91,7 +91,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and publish Windows artifacts
-        run: npm run build:win -- --publish always
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Build Windows artifacts
+        run: npm run build:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: dist/*.{exe,msi}
+          retention-days: 5
