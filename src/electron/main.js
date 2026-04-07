@@ -124,13 +124,30 @@ function buildMenu() {
         }
     ] : [];
 
+    const winHelpMenu = !isMac ? [
+        {
+            label: 'Help',
+            submenu: [
+                {
+                    label: 'About SubCat',
+                    click: () => ipcMain.emit('show-about')
+                },
+                { type: 'separator' },
+                {
+                    label: 'Learn More',
+                    click: () => shell.openExternal('https://github.com/semisse/subcat')
+                }
+            ]
+        }
+    ] : [];
+
     const template = [
         ...macAppMenu,
         {
             label: 'File',
             submenu: [
                 {
-                    label: 'New Watch\u2026',
+                    label: 'New Watch…',
                     accelerator: 'CmdOrCtrl+N',
                     click() {
                         mainWindow?.webContents.send('open-new-watch');
@@ -159,7 +176,8 @@ function buildMenu() {
                 { role: 'zoom' },
                 ...(isMac ? [{ role: 'front' }] : [])
             ]
-        }
+        },
+        ...winHelpMenu
     ];
 
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
