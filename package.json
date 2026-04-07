@@ -11,9 +11,10 @@
     "test:coverage": "NODE_NO_WARNINGS=1 jest --coverage",
     "lint": "eslint src/ renderer/",
     "build": "electron-builder",
-    "build:mac": "electron-builder --mac --config.mac.target=dmg",
     "build:linux": "electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps && ([[ \"$OSTYPE\" == \"darwin\"* ]] && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist || true)"
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac --config.mac.target=dmg",
+    "postinstall": "electron-builder install-app-deps"
   },
   "build": {
     "appId": "com.samuelfialho.subcat",
@@ -51,6 +52,19 @@
       "maintainer": "Samuel Fialho",
       "synopsis": "SubCat watches GitHub Actions runs and investigates flaky tests",
       "description": "Get notified when a GitHub Actions CI run finishes and investigate flaky tests automatically."
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
     },
     "publish": {
       "provider": "github",
