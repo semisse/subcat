@@ -109,6 +109,14 @@ function register({ db, poller, storage, getWindow, getUser }) {
     handle('delete-pending-rerun', async (event, opts) => {
         db.deletePendingRerun(opts);
     });
+
+    handle('get-pr-stats', async () => {
+        try {
+            return db.getPRStats();
+        } catch (e) {
+            return { error: e.message };
+        }
+    });
 }
 
 module.exports = { register };

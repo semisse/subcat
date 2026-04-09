@@ -185,4 +185,49 @@ function deletePendingRerun({ owner, repo, runId }) {
     getDb().prepare(`DELETE FROM pending_reruns WHERE id = ?`).run(id);
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun };
+function getPRStats() {
+    const db = getDb();
+    
+    const totalRuns = db.prepare(`SELECT COUNT(*) as count FROM run_results`).get().count;
+    const totalSuccess = db.prepare(`SELECT COUNT(*) as count FROM run_results WHERE conclusion = 'success'`).get().count;
+    const totalFailed = db.prepare(`SELECT COUNT(*) as count FROM run_results WHERE conclusion != 'success'`).get().count;
+    
+    const durationResult = db.prepare(`
+        SELECT SUM(CASE 
+            WHEN started_at IS NOT NULL AND completed_at IS NOT NULL 
+            THEN (julianday(completed_at) - julianday(started_at)) * 86400 
+            ELSE 0 
+        END) as total
+        FROM run_results
+    `).get();
+    const totalDuration = durationResult?.total || 0;
+    
+    const failureRate = totalRuns > 0 ? (totalFailed / totalRuns) * 100 : 0;
+    const painScore = totalRuns > 0 ? Math.round((totalRuns * (failureRate / 100) * (totalDuration / 60)) / 100) : 0;
+    
+    const mostExpensiveRun = db.prepare(`
+        SELECT r.owner, r.repo, r.name as workflow_name, COUNT(rr.id) as run_count
+        FROM runs r
+        LEFT JOIN run_results rr ON r.id = rr.run_id
+        GROUP BY r.owner, r.repo
+        ORDER BY run_count DESC
+        LIMIT 1
+    `).get();
+    
+    return {
+        totalRuns,
+        totalSuccess,
+        totalFailed,
+        totalDuration,
+        failureRate: Math.round(failureRate * 10) / 10,
+        painScore,
+        mostExpensivePR: mostExpensiveRun?.owner ? {
+            owner: mostExpensiveRun.owner,
+            repo: mostExpensiveRun.repo,
+            workflowName: mostExpensiveRun.workflow_name,
+            runCount: mostExpensiveRun.run_count
+        } : null
+    };
+}
+
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, getPRStats };

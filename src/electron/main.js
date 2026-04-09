@@ -63,7 +63,15 @@ function createLoginWindow() {
 }
 
 function createMainWindow() {
-    mainWindow = new BrowserWindow({ width: 560, height: 680, resizable: true, ...windowPrefs });
+    mainWindow = new BrowserWindow({ 
+        width: 1200, 
+        height: 800, 
+        minWidth: 800, 
+        minHeight: 600, 
+        resizable: true, 
+        titleBarStyle: 'hidden',
+        ...windowPrefs 
+    });
     mainWindow.loadFile(path.join(__dirname, '../../index.html'));
     mainWindow.on('closed', () => { mainWindow = null; });
 }
@@ -148,6 +156,19 @@ function buildMenu() {
                 { role: 'copy' },
                 { role: 'paste' },
                 { role: 'selectAll' }
+            ]
+        },
+        {
+            label: 'View',
+            submenu: [
+                { role: 'reload' },
+                { role: 'toggleDevTools' },
+                { type: 'separator' },
+                { role: 'resetZoom' },
+                { role: 'zoomIn' },
+                { role: 'zoomOut' },
+                { type: 'separator' },
+                { role: 'togglefullscreen' }
             ]
         },
         {

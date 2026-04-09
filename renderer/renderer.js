@@ -1,3 +1,66 @@
+// Page Navigation
+const pageTitles = {
+    'home': 'Dashboard',
+    'my-prs': 'My PRs',
+    'runs': 'Runs',
+    'reports': 'Reports',
+    'profile': 'Profile'
+};
+
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = item.dataset.page;
+        switchPage(page);
+    });
+});
+
+document.getElementById('breadcrumbHome')?.addEventListener('click', () => {
+    switchPage('home');
+});
+
+function updateBreadcrumb(page1, page2) {
+    const home = document.getElementById('breadcrumbHome');
+    const sep1 = document.getElementById('sep1');
+    const p1 = document.getElementById('breadcrumbPage1');
+    const p2 = document.getElementById('breadcrumbPage2');
+    
+    if (home) home.classList.remove('current');
+    
+    if (page1) {
+        if (p1) { p1.textContent = page1; p1.style.display = ''; }
+        if (sep1) sep1.style.display = page2 ? '' : 'none';
+    } else {
+        if (p1) { p1.textContent = ''; p1.style.display = 'none'; }
+        if (sep1) sep1.style.display = 'none';
+    }
+    
+    if (page2) {
+        if (p2) { p2.textContent = page2; p2.style.display = ''; }
+    } else {
+        if (p2) { p2.textContent = ''; p2.style.display = 'none'; }
+    }
+}
+
+function switchPage(page) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
+    
+    document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+    const pageId = page === 'my-prs' ? 'pageMyprs' : `page${page.charAt(0).toUpperCase() + page.slice(1).replace('-', '')}`;
+    document.getElementById(pageId)?.classList.add('active');
+    
+    updateBreadcrumb(pageTitles[page], null);
+}
+
+document.getElementById('sidebarUser')?.addEventListener('click', () => {
+    switchPage('profile');
+});
+
+document.querySelectorAll('.detail-view').forEach(v => v.classList.remove('active'));
+const prListView = document.getElementById('prListView');
+if (prListView) prListView.classList.add('active');
+
 const myPrsSection = document.getElementById('myPrsSection');
 const myPrsList = document.getElementById('myPrsList');
 const myPrsNav = document.getElementById('myPrsNav');
@@ -40,6 +103,7 @@ const errorContainer = document.getElementById('errorContainer');
 const logoutBtn = document.getElementById('logoutBtn');
 const authAvatar = document.getElementById('authAvatar');
 const authUsername = document.getElementById('authUsername');
+const authEmail = document.getElementById('authEmail');
 const appVersion = document.getElementById('appVersion');
 
 const watchedRuns = new Map();
@@ -49,12 +113,24 @@ async function initUser() {
         window.api.authGetStatus(),
         window.api.getVersion()
     ]);
-    appVersion.textContent = `v${version}`;
+    if (appVersion) appVersion.textContent = `v${version}`;
     if (status.loggedIn) {
-        authUsername.textContent = status.login;
+        if (authUsername) authUsername.textContent = status.login;
+        if (authEmail) authEmail.textContent = status.email || `${status.login}@github.com`;
         if (status.avatarUrl) {
-            authAvatar.src = status.avatarUrl;
-            authAvatar.style.display = 'block';
+            if (authAvatar) {
+                authAvatar.src = status.avatarUrl;
+                authAvatar.style.display = 'block';
+            }
+            const profileAvatar = document.getElementById('profileAvatar');
+            if (profileAvatar) {
+                profileAvatar.src = status.avatarUrl;
+                profileAvatar.style.display = 'block';
+            }
+            const profileName = document.getElementById('profileName');
+            if (profileName) profileName.textContent = status.login;
+            const profileEmail = document.getElementById('profileEmail');
+            if (profileEmail) profileEmail.textContent = status.email || `${status.login}@github.com`;
         }
     }
 }
@@ -113,54 +189,151 @@ logoutBtn.addEventListener('click', async () => {
 
 initUser();
 loadUserPRs();
+loadPRStats();
+
+function updateDashboardStats() {
+    const totalPRs = document.getElementById('totalPRs');
+    const totalRuns = document.getElementById('totalRuns');
+    const totalFailures = document.getElementById('totalFailures');
+    const flakyRate = document.getElementById('flakyRate');
+    
+    if (totalPRs) totalPRs.textContent = myPrsList?.children.length || 0;
+    if (totalRuns) totalRuns.textContent = watchedRuns.size;
+    
+    let failures = 0;
+    watchedRuns.forEach(run => {
+        if (run.conclusion === 'failure') failures++;
+    });
+    if (totalFailures) totalFailures.textContent = failures;
+    
+    const rate = watchedRuns.size > 0 ? Math.round((failures / watchedRuns.size) * 100) : 0;
+    if (flakyRate) flakyRate.textContent = `${rate}%`;
+}
+
+function showMyPrsDetail(pr) {
+    switchPage('my-prs');
+    openPRDetail(pr);
+}
+
+function showMyPrsList() {
+    updateBreadcrumb('My PRs', null);
+    const prListView = document.getElementById('prListView');
+    const prDetailView = document.getElementById('prDetailView');
+    const workflowRunsView = document.getElementById('workflowRunsView');
+    const myPrsList = document.getElementById('myPrsList');
+    if (workflowRunsView) workflowRunsView.classList.remove('active');
+    if (prDetailView) prDetailView.classList.remove('active');
+    if (prListView) prListView.classList.add('active');
+    if (myPrsList && !myPrsList.children.length) {
+        loadUserPRs();
+    }
+}
+
+function showWorkflowRunsDetail() {
+    const prDetailView = document.getElementById('prDetailView');
+    const workflowRunsView = document.getElementById('workflowRunsView');
+    if (prDetailView) prDetailView.classList.remove('active');
+    if (workflowRunsView) workflowRunsView.classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.nav-item[data-page="my-prs"]').forEach(item => {
+        item.addEventListener('click', () => {
+            showMyPrsList();
+        });
+    });
+    
+    document.querySelectorAll('.toggle-switch').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            toggle.classList.toggle('active');
+        });
+    });
+});
+
+async function loadPRStats() {
+    const stats = await window.api.getPRStats();
+    if (stats.error) {
+        console.error('Failed to load PR stats:', stats.error);
+        return;
+    }
+    
+    document.getElementById('statTotalRuns').textContent = stats.totalRuns || 0;
+    
+    const totalDuration = stats.totalDuration || 0;
+    const durationText = totalDuration >= 3600 
+        ? `${Math.round(totalDuration / 3600)}h ${Math.round((totalDuration % 3600) / 60)}m`
+        : totalDuration >= 60 
+            ? `${Math.round(totalDuration / 60)}m`
+            : `${Math.round(totalDuration)}s`;
+    document.getElementById('statTotalDuration').textContent = durationText;
+    
+    document.getElementById('statFailureRate').textContent = `${stats.failureRate || 0}%`;
+    document.getElementById('statPainIndex').textContent = stats.painScore || 0;
+    
+    const mostExpensive = document.getElementById('prMostExpensive');
+    const mostExpensiveText = document.getElementById('statMostExpensive');
+    if (stats.mostExpensivePR) {
+        mostExpensive.style.display = 'flex';
+        mostExpensiveText.textContent = `${stats.mostExpensivePR.owner}/${stats.mostExpensivePR.repo} cost ${stats.mostExpensivePR.runCount} runs of CI`;
+    } else {
+        mostExpensive.style.display = 'none';
+    }
+}
 
 async function loadUserPRs() {
     const result = await window.api.fetchUserPRs();
-    if (result.error || !result.prs?.length) return;
+    if (result.error || !result.prs?.length) {
+        updateDashboardStats();
+        return;
+    }
 
-    myPrsSection.style.display = 'block';
-    myPrsList.innerHTML = '';
+    if (myPrsList) myPrsList.innerHTML = '';
 
-    if (result.prs.length > 4) myPrsList.classList.add('scrollable');
+    if (result.prs.length > 4 && myPrsList) myPrsList.classList.add('scrollable');
 
     for (const pr of result.prs) {
         const item = document.createElement('div');
         item.className = 'my-pr-item';
+        item.dataset.pr = JSON.stringify(pr);
         item.innerHTML = `
             <div class="pr-item-info">
-                <div class="my-pr-meta">${escapeHtml(pr.owner)}/${escapeHtml(pr.repo)} · #${pr.number}</div>
-                <div class="my-pr-title">${escapeHtml(pr.title)}</div>
+                <div class="pr-item-repo">${escapeHtml(pr.owner)}/${escapeHtml(pr.repo)} · #${pr.number}</div>
+                <div class="pr-item-title">${escapeHtml(pr.title)}</div>
             </div>
-            <div class="pr-ci-badge">
+            <div class="pr-item-badge">
                 <span class="pr-loading-spinner"></span>
             </div>
         `;
-        item.addEventListener('click', () => openPRDetail(pr));
-        myPrsList.appendChild(item);
+        item.addEventListener('click', () => {
+            showMyPrsDetail(pr);
+        });
+        if (myPrsList) myPrsList.appendChild(item);
 
         window.api.fetchPRRuns(`https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`)
             .then(r => {
-                const badge = item.querySelector('.pr-ci-badge');
+                const badge = item.querySelector('.pr-item-badge');
                 if (!badge) return;
                 const status = r.error || !r.runs?.length ? '' : aggregatePRStatus(r.runs);
                 badge.innerHTML = `<span class="status-dot ${status}"></span>`;
             })
             .catch(() => {
-                const badge = item.querySelector('.pr-ci-badge');
+                const badge = item.querySelector('.pr-item-badge');
                 if (badge) badge.innerHTML = '<span class="status-dot"></span>';
             });
 
         window.api.fetchPRReviews({ owner: pr.owner, repo: pr.repo, prNumber: pr.number })
             .then(r => {
                 if (r.error || r.reviewCount === 0) return;
-                const meta = item.querySelector('.my-pr-meta');
-                if (!meta) return;
-                const label = r.approved ? '✓ approved' : r.changesRequested ? '✗ changes' : `${r.reviewCount} review${r.reviewCount > 1 ? 's' : ''}`;
-                const cls = r.approved ? 'pr-review-approved' : r.changesRequested ? 'pr-review-changes' : 'pr-review-pending';
-                meta.innerHTML += ` · <span class="${cls}">${escapeHtml(label)}</span>`;
+                const badge = item.querySelector('.pr-item-badge');
+                if (!badge) return;
+                const label = r.approved ? 'approved' : r.changesRequested ? 'changes' : `${r.reviewCount} review${r.reviewCount > 1 ? 's' : ''}`;
+                const cls = r.approved ? 'approved' : r.changesRequested ? 'changes' : 'pending';
+                badge.innerHTML += `<span class="pr-review-badge ${cls}">${escapeHtml(label)}</span>`;
             })
             .catch(() => {});
     }
+    
+    updateDashboardStats();
 }
 
 function aggregatePRStatus(runs) {
@@ -186,47 +359,49 @@ function getSectionItems(source) {
     return sectionRunsItems;
 }
 
+function getRunsListPage() {
+    return document.getElementById('runsListPage');
+}
+
 function showMainView() {
     clearLevel3Poll();
     currentView = 'main';
-    myPrsList.style.display = '';
-    prDetailList.style.display = 'none';
-    workflowRunsList.style.display = 'none';
-    prDetailNav.style.display = 'none';
-    workflowRunsNav.style.display = 'none';
-    myPrsNav.style.display = 'flex';
-    prDetailList.innerHTML = '';
-    prDetailTitle.textContent = '';
-    runsList.style.display = '';
-    emptyState.style.display = !hasAnyItems() ? 'flex' : 'none';
-    document.querySelector('.input-section').style.display = '';
+    if (myPrsList) myPrsList.style.display = '';
+    if (prDetailList) { prDetailList.style.display = 'none'; prDetailList.innerHTML = ''; }
+    if (workflowRunsList) workflowRunsList.style.display = 'none';
+    if (prDetailNav) prDetailNav.style.display = 'none';
+    if (workflowRunsNav) workflowRunsNav.style.display = 'none';
+    if (myPrsNav) myPrsNav.style.display = 'flex';
+    if (prDetailTitle) prDetailTitle.textContent = '';
+    if (runsList) runsList.style.display = '';
+    if (emptyState) emptyState.style.display = !hasAnyItems() ? 'flex' : 'none';
+    if (document.querySelector('.input-section')) document.querySelector('.input-section').style.display = '';
 }
 
 function showPRDetailView() {
-    clearLevel3Poll();
     currentView = 'pr-detail';
-    myPrsList.style.display = 'none';
-    prDetailList.style.display = 'block';
-    workflowRunsList.style.display = 'none';
-    myPrsNav.style.display = 'none';
-    prDetailNav.style.display = 'flex';
-    workflowRunsNav.style.display = 'none';
-    runsList.style.display = 'none';
-    emptyState.style.display = 'none';
-    document.querySelector('.input-section').style.display = 'none';
+    if (myPrsList) myPrsList.style.display = 'none';
+    if (prDetailList) prDetailList.style.display = 'block';
+    if (workflowRunsList) workflowRunsList.style.display = 'none';
+    if (myPrsNav) myPrsNav.style.display = 'none';
+    if (prDetailNav) prDetailNav.style.display = 'flex';
+    if (workflowRunsNav) workflowRunsNav.style.display = 'none';
+    if (runsList) runsList.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'none';
+    document.querySelector('.input-section')?.style && (document.querySelector('.input-section').style.display = 'none');
 }
 
 function showWorkflowRunsView() {
     currentView = 'workflow-runs';
-    myPrsList.style.display = 'none';
-    prDetailList.style.display = 'none';
-    workflowRunsList.style.display = 'block';
-    myPrsNav.style.display = 'none';
-    prDetailNav.style.display = 'none';
-    workflowRunsNav.style.display = 'flex';
-    runsList.style.display = 'none';
-    emptyState.style.display = 'none';
-    document.querySelector('.input-section').style.display = 'none';
+    if (myPrsList) myPrsList.style.display = 'none';
+    if (prDetailList) prDetailList.style.display = 'none';
+    if (workflowRunsList) workflowRunsList.style.display = 'block';
+    if (myPrsNav) myPrsNav.style.display = 'none';
+    if (prDetailNav) prDetailNav.style.display = 'none';
+    if (workflowRunsNav) workflowRunsNav.style.display = 'flex';
+    if (runsList) runsList.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'none';
+    document.querySelector('.input-section')?.style && (document.querySelector('.input-section').style.display = 'none');
 }
 
 let currentView = 'main';
@@ -257,19 +432,31 @@ function clearLevel3Poll() {
 
 async function openPRDetail(pr) {
     currentPR = pr;
-    showPRDetailView();
-    prDetailTitle.textContent = `${pr.title} #${pr.number}`;
-    prDetailList.style.display = 'none';
-    prDetailList.innerHTML = '';
-    loadingText.textContent = 'Loading…';
-    loadingState.classList.add('visible');
+    updateBreadcrumb('My PRs', `${pr.title} #${pr.number}`);
+    
+    const prListView = document.getElementById('prListView');
+    const prDetailView = document.getElementById('prDetailView');
+    const workflowRunsView = document.getElementById('workflowRunsView');
+    if (prListView) prListView.classList.remove('active');
+    if (prDetailView) {
+        prDetailView.classList.add('active');
+        if (prDetailTitle) prDetailTitle.textContent = `${pr.title} #${pr.number}`;
+    }
+    if (workflowRunsView) workflowRunsView.classList.remove('active');
+    
+    if (prDetailList) {
+        prDetailList.style.display = 'none';
+        prDetailList.innerHTML = '';
+    }
+    if (loadingText) loadingText.textContent = 'Loading…';
+    if (loadingState) loadingState.classList.add('visible');
 
     const result = await window.api.fetchPRRuns(`https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`);
-    loadingState.classList.remove('visible');
-    prDetailList.style.display = 'block';
+    if (loadingState) loadingState.classList.remove('visible');
+    if (prDetailList) prDetailList.style.display = 'block';
 
     if (result.error || !result.runs?.length) {
-        prDetailList.innerHTML = '<div class="pr-detail-empty">No workflows found.</div>';
+        if (prDetailList) prDetailList.innerHTML = '<div class="pr-detail-empty">No workflows found.</div>';
         return;
     }
 
@@ -294,7 +481,7 @@ async function openPRDetail(pr) {
             openWorkflowRuns(run, currentPRContext);
         });
         item.querySelector('.open-run-btn').addEventListener('click', () => window.api.openExternal(run.url));
-        prDetailList.appendChild(item);
+        if (prDetailList) prDetailList.appendChild(item);
     }
 }
 
@@ -352,8 +539,11 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     currentWorkflow = workflow;
     workflowRunsBackTarget = backTarget;
     currentPRContext = { owner, repo, headRef: headRef ?? null };
+    
+    updateBreadcrumb('My PRs', workflow.name);
+    
     showWorkflowRunsView();
-    workflowRunsTitle.textContent = workflow.name;
+    if (workflowRunsTitle) workflowRunsTitle.textContent = workflow.name;
 
     if (!isRefresh) {
         workflowRunsList.style.display = 'none';
@@ -506,11 +696,33 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     updatePinBtnState();
 }
 
-prDetailBack.addEventListener('click', showMainView);
-workflowRunsBack.addEventListener('click', () => {
-    if (workflowRunsBackTarget === 'main') showMainView();
-    else if (currentPR) openPRDetail(currentPR);
-    else showPRDetailView();
+prDetailBack?.addEventListener('click', () => {
+    const currentPage = document.querySelector('.nav-item.active')?.dataset.page;
+    if (currentPage === 'my-prs') {
+        updateBreadcrumb('My PRs', null);
+        showMyPrsList();
+    } else {
+        updateBreadcrumb('Dashboard', null);
+        showMainView();
+    }
+});
+
+workflowRunsBack?.addEventListener('click', () => {
+    const currentPage = document.querySelector('.nav-item.active')?.dataset.page;
+    if (currentPage === 'my-prs') {
+        showWorkflowRunsDetail();
+        if (currentPR) {
+            if (prDetailTitle) prDetailTitle.textContent = `${currentPR.title} #${currentPR.number}`;
+            updateBreadcrumb('My PRs', `${currentPR.title} #${currentPR.number}`);
+        }
+    } else if (workflowRunsBackTarget === 'main') {
+        updateBreadcrumb('Dashboard', null);
+        showMainView();
+    } else if (currentPR) {
+        openPRDetail(currentPR);
+    } else {
+        showPRDetailView();
+    }
 });
 workflowRunsCancelAllBtn.addEventListener('click', async () => {
     if (!currentWorkflowRuns || !currentPRContext) return;
@@ -542,7 +754,7 @@ function updatePinBtnState() {
     workflowRunsPinBtn.disabled = isWatched;
 }
 
-workflowRunsPinBtn.addEventListener('click', async () => {
+workflowRunsPinBtn?.addEventListener('click', async () => {
     if (!currentWorkflowRuns?.length || !currentPRContext) return;
     const latestRun = currentWorkflowRuns[0];
     const runUrl = `https://github.com/${currentPRContext.owner}/${currentPRContext.repo}/actions/runs/${latestRun.runId}`;
@@ -640,32 +852,38 @@ window.api.onWorkflowRunAppeared(async ({ owner, repo, runId }) => {
     workflowRunsRerunBtn.textContent = '↩ Rerun';
 });
 
-addBtn.addEventListener('click', () => {
-    urlForm.style.display = 'block';
-    addBtn.style.display = 'none';
-    urlInput.focus();
+addBtn?.addEventListener('click', () => {
+    switchPage('runs');
+    if (urlForm) {
+        urlForm.style.display = 'block';
+        if (urlInput) urlInput.focus();
+    }
 });
 
 window.api.onOpenNewWatch(() => {
-    if (currentView !== 'main') return;
-    if (urlForm.style.display === 'block') return; // already open
-    addBtn.click();
+    switchPage('runs');
+    if (urlForm) {
+        urlForm.style.display = 'block';
+        if (urlInput) urlInput.focus();
+    }
 });
 
-cancelBtn.addEventListener('click', () => resetForm());
+cancelBtn?.addEventListener('click', () => resetForm());
 
 const prPicker = document.getElementById('prPicker');
 let selectedRunUrl = null;
 
 function resetForm() {
-    urlInput.value = '';
-    repeatInput.value = '1';
-    repeatInput.disabled = false;
-    repeatInput.parentElement.style.display = '';
-    urlForm.style.display = 'none';
-    addBtn.style.display = 'block';
-    prPicker.innerHTML = '';
-    prPicker.style.display = 'none';
+    if (urlInput) urlInput.value = '';
+    if (repeatInput) {
+        repeatInput.value = '1';
+        repeatInput.disabled = false;
+        repeatInput.parentElement.style.display = '';
+    }
+    if (prPicker) {
+        prPicker.innerHTML = '';
+        prPicker.style.display = 'none';
+    }
     selectedRunUrl = null;
     watchBtn.textContent = 'Watch';
     watchBtn.disabled = false;
@@ -885,7 +1103,48 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
 
     getSectionItems(source).prepend(card);
     updateSectionVisibility();
+    
+    const runsListPage = getRunsListPage();
+    if (runsListPage) {
+        const cardClone = card.cloneNode(true);
+        cardClone.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            const parsed = parseGitHubRunUrl(url);
+            if (!parsed) return;
+            openWorkflowRuns({ runId: parsed.runId, name }, { owner: parsed.owner, repo: parsed.repo }, 'main');
+        });
+        cardClone.querySelector('.open-btn')?.addEventListener('click', () => window.api.openExternal(url));
+        cardClone.querySelector('.cancel-run-btn')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            btn.textContent = 'Stopping…';
+            await window.api.cancelRun(runId);
+            cardClone.remove();
+            watchedRuns.delete(runId);
+            if (!hasAnyItems()) emptyState.style.display = 'flex';
+            updateSectionVisibility();
+        });
+        cardClone.querySelector('.remove-btn')?.addEventListener('click', async () => {
+            if (cardClone.dataset.active === 'true') {
+                const confirmed = await window.api.confirm(
+                    'Stop and remove run?',
+                    'This run is still active. It will be stopped but not cancelled on GitHub.'
+                );
+                if (!confirmed) return;
+            }
+            await window.api.stopWatching(runId);
+            cardClone.remove();
+            watchedRuns.delete(runId);
+            if (!hasAnyItems()) emptyState.style.display = 'flex';
+            updateSectionVisibility();
+        });
+        const emptyStatePage = runsListPage.querySelector('.empty-state');
+        if (emptyStatePage) emptyStatePage.style.display = 'none';
+        runsListPage.prepend(cardClone);
+    }
+    
     watchedRuns.set(runId, { name, status, conclusion, url, repeatTotal, source });
+    loadPRStats();
 }
 
 function getCardClass(status, conclusion) {

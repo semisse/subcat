@@ -39,5 +39,6 @@ contextBridge.exposeInMainWorld('api', {
     onOpenNewWatch: (callback) => ipcRenderer.on('open-new-watch', () => callback()),
     savePendingRerun: (opts) => ipcRenderer.invoke('save-pending-rerun', opts),
     getPendingRerun: (opts) => ipcRenderer.invoke('get-pending-rerun', opts),
-    deletePendingRerun: (opts) => ipcRenderer.invoke('delete-pending-rerun', opts)
+    deletePendingRerun: (opts) => ipcRenderer.invoke('delete-pending-rerun', opts),
+    getPRStats: () => ipcRenderer.invoke('get-pr-stats')
 });
