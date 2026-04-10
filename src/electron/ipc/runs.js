@@ -30,7 +30,15 @@ function register({ db, poller, storage, getWindow, getUser }) {
     });
 
     handle('fetch-run-attempts', async (event, opts) => {
-        return runs.fetchRunAttemptsHandler(opts, { getToken });
+        const result = await runs.fetchRunAttemptsHandler(opts, { getToken });
+        if (!result.error) {
+            result.failedOnlyAttempts = db.getFailedOnlyAttempts(opts);
+        }
+        return result;
+    });
+
+    handle('save-failed-only-attempt', async (event, opts) => {
+        db.saveFailedOnlyAttempt(opts);
     });
 
     handle('fetch-pr-reviews', async (event, opts) => {
@@ -74,8 +82,12 @@ function register({ db, poller, storage, getWindow, getUser }) {
         return runs.rerunRunDirect(owner, repo, runId, { getToken });
     });
 
-    handle('rerun-failed-jobs-direct', async (event, { owner, repo, runId }) => {
-        return runs.rerunFailedJobsDirect(owner, repo, runId, { getToken });
+    handle('rerun-failed-jobs-direct', async (event, { owner, repo, runId, previousAttemptCount }) => {
+        const result = await runs.rerunFailedJobsDirect(owner, repo, runId, { getToken });
+        if (!result.error && previousAttemptCount != null) {
+            poller.watchAttempt({ owner, repo, runId, previousAttemptCount }, getToken);
+        }
+        return result;
     });
 
     handle('cancel-run-direct', async (event, { owner, repo, runId }) => {

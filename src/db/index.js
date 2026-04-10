@@ -68,6 +68,16 @@ function migrate(db) {
     try { db.exec(`ALTER TABLE runs ADD COLUMN head_sha TEXT`); } catch (_) {}
 
     db.exec(`
+        CREATE TABLE IF NOT EXISTS failed_only_attempts (
+            id TEXT PRIMARY KEY,
+            owner TEXT NOT NULL,
+            repo TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            attempt_num INTEGER NOT NULL
+        );
+    `);
+
+    db.exec(`
         CREATE TABLE IF NOT EXISTS pending_reruns (
             id TEXT PRIMARY KEY,
             owner TEXT NOT NULL,
@@ -90,6 +100,19 @@ function migrate(db) {
             failed INTEGER NOT NULL DEFAULT 0,
             flakiness TEXT NOT NULL DEFAULT 'Stable',
             saved_at TEXT NOT NULL
+        );
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            url TEXT,
+            conclusion TEXT NOT NULL,
+            run_name TEXT NOT NULL,
+            triggered_at TEXT NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0
         );
     `);
 }
@@ -218,6 +241,29 @@ function deleteSavedReport(id) {
     getDb().prepare(`DELETE FROM saved_reports WHERE id = ?`).run(id);
 }
 
+function addNotification({ title, body, url, conclusion, runName }) {
+    return getDb().prepare(`
+        INSERT INTO notifications (title, body, url, conclusion, run_name, triggered_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `).run(title, body, url ?? null, conclusion, runName, new Date().toISOString());
+}
+
+function getNotifications(limit = 100) {
+    return getDb().prepare(`SELECT * FROM notifications ORDER BY triggered_at DESC LIMIT ?`).all(limit);
+}
+
+function getUnreadNotificationCount() {
+    return getDb().prepare(`SELECT COUNT(*) as count FROM notifications WHERE read = 0`).get().count;
+}
+
+function markAllNotificationsRead() {
+    getDb().prepare(`UPDATE notifications SET read = 1 WHERE read = 0`).run();
+}
+
+function clearNotifications() {
+    getDb().prepare(`DELETE FROM notifications`).run();
+}
+
 function getLabRuns() {
     return getDb().prepare(`
         SELECT r.*,
@@ -282,4 +328,18 @@ function getPRStats() {
     };
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, getPRStats, addSavedReport, getAllSavedReports, deleteSavedReport, getLabRuns, getRunResultById };
+function saveFailedOnlyAttempt({ owner, repo, runId, attemptNum }) {
+    const id = `${owner}/${repo}/${runId}/${attemptNum}`;
+    getDb().prepare(`
+        INSERT OR IGNORE INTO failed_only_attempts (id, owner, repo, run_id, attempt_num)
+        VALUES (?, ?, ?, ?, ?)
+    `).run(id, owner, repo, runId, attemptNum);
+}
+
+function getFailedOnlyAttempts({ owner, repo, runId }) {
+    return getDb().prepare(
+        `SELECT attempt_num FROM failed_only_attempts WHERE owner = ? AND repo = ? AND run_id = ?`
+    ).all(owner, repo, runId).map(r => r.attempt_num);
+}
+
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, saveFailedOnlyAttempt, getFailedOnlyAttempts, getPRStats, addSavedReport, getAllSavedReports, deleteSavedReport, getLabRuns, getRunResultById, addNotification, getNotifications, getUnreadNotificationCount, markAllNotificationsRead, clearNotifications };

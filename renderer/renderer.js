@@ -83,7 +83,7 @@ async function loadSavedReports() {
         item.innerHTML = `
             <div class="saved-report-title" title="${escapeHtml(r.file_path)}">${escapeHtml(r.title)}</div>
             <span class="saved-report-badge ${badgeClass}">${escapeHtml(r.flakiness)}</span>
-            <div class="saved-report-meta">${r.passed}✅ ${r.failed}❌ · ${escapeHtml(date)}</div>
+            <div class="saved-report-meta">${r.passed} ✅ / ${r.failed} ❌ · ${escapeHtml(date)}</div>
             <div class="saved-report-actions">
                 <button class="reveal-btn" title="Show in Finder">Show in Finder</button>
                 <button class="delete-btn" title="Remove from list">Remove</button>
@@ -134,6 +134,8 @@ const workflowRepeatInput = document.getElementById('workflowRepeatInput');
 const pendingRepeatTotals = new Map(); // runId → repeatTotal
 
 const addBtn = document.getElementById('addBtn');
+const watchDockTrigger = document.getElementById('watchDockTrigger');
+const urlFormClose = document.getElementById('urlFormClose');
 const urlForm = document.getElementById('urlForm');
 const urlInput = document.getElementById('urlInput');
 const repeatInput = document.getElementById('repeatInput');
@@ -161,6 +163,16 @@ const appVersion = document.getElementById('appVersion');
 
 const watchedRuns = new Map();
 
+// ── Feature Flags ───────────────────────────────────────────────────────────
+
+let featureFlags = {};
+
+async function initFeatureFlags() {
+    featureFlags = await window.api.getFeatureFlags();
+    const navLabRuns = document.getElementById('navLabRuns');
+    if (navLabRuns) navLabRuns.style.display = featureFlags['lab-runs'] ? '' : 'none';
+}
+
 async function initUser() {
     const [status, version] = await Promise.all([
         window.api.authGetStatus(),
@@ -169,6 +181,8 @@ async function initUser() {
     if (appVersion) appVersion.textContent = `v${version}`;
     if (status.loggedIn) {
         if (authUsername) authUsername.textContent = status.login;
+        const welcomeUsername = document.getElementById('welcomeUsername');
+        if (welcomeUsername) welcomeUsername.textContent = status.login;
         if (authEmail) authEmail.textContent = status.email || `${status.login}@github.com`;
         if (status.avatarUrl) {
             if (authAvatar) {
@@ -254,6 +268,7 @@ logoutBtn.addEventListener('click', async () => {
     await window.api.authLogout();
 });
 
+initFeatureFlags();
 initUser();
 loadUserPRs();
 loadPRStats();
@@ -469,9 +484,14 @@ function showPRDetailView() {
     if (workflowRunsNav) workflowRunsNav.style.display = 'none';
 }
 
-function showWorkflowRunsView() {
+function showWorkflowRunsView(navPage = 'my-prs') {
     currentView = 'workflow-runs';
-    switchPage('my-prs');
+    switchPage('my-prs'); // workflowRunsView lives inside pageMyprs
+    // Override sidebar highlight when navigating from a different source
+    if (navPage !== 'my-prs') {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelector(`.nav-item[data-page="${navPage}"]`)?.classList.add('active');
+    }
     document.getElementById('prListView')?.classList.remove('active');
     document.getElementById('prDetailView')?.classList.remove('active');
     document.getElementById('workflowRunsView')?.classList.add('active');
@@ -490,9 +510,12 @@ let level3PollInterval = null;
 let inMemoryPendingRerun = null; // { owner, repo, runId, fromAttempt, total }
 const failedOnlyAttempts = new Map(); // runId → Set<attemptNumber>
 
-function markFailedOnlyAttempt(runId, attemptNum) {
+function markFailedOnlyAttempt(runId, attemptNum, owner, repo) {
     if (!failedOnlyAttempts.has(runId)) failedOnlyAttempts.set(runId, new Set());
     failedOnlyAttempts.get(runId).add(attemptNum);
+    if (owner && repo) {
+        window.api.saveFailedOnlyAttempt({ owner, repo, runId, attemptNum });
+    }
 }
 
 function isFailedOnlyAttempt(runId, attemptNum) {
@@ -595,13 +618,14 @@ function createRunItem(run, owner, repo, { isLatestFailed = false } = {}) {
             const btn = e.currentTarget;
             btn.disabled = true;
             btn.textContent = 'Starting…';
-            const result = await window.api.rerunFailedJobsDirect({ owner, repo, runId: run.runId });
+            const previousAttemptCount = currentWorkflowRuns.length;
+            const result = await window.api.rerunFailedJobsDirect({ owner, repo, runId: run.runId, previousAttemptCount });
             if (result.error) {
                 btn.disabled = false;
                 btn.textContent = '↩ Rerun Failed Only';
             } else {
                 const nextAttempt = currentWorkflowRuns.length + 1;
-                markFailedOnlyAttempt(run.runId, nextAttempt);
+                markFailedOnlyAttempt(run.runId, nextAttempt, owner, repo);
                 btn.remove();
 
                 // Add placeholder so the user sees the new attempt immediately
@@ -635,11 +659,18 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     currentWorkflow = workflow;
     workflowRunsBackTarget = backTarget;
     currentPRContext = { owner, repo, headRef: headRef ?? null };
-    
-    const prLabel = currentPR ? `${currentPR.title} #${currentPR.number}` : null;
-    updateBreadcrumb('My PRs', prLabel, workflow.name);
 
-    showWorkflowRunsView();
+    const isRunsSource = backTarget === 'runs';
+    const navPage = isRunsSource ? 'runs' : 'my-prs';
+    const prLabel = !isRunsSource && currentPR ? `${currentPR.title} #${currentPR.number}` : null;
+
+    if (isRunsSource) {
+        updateBreadcrumb('Runs', workflow.name);
+    } else {
+        updateBreadcrumb('My PRs', prLabel, workflow.name);
+    }
+
+    showWorkflowRunsView(navPage);
     if (workflowRunsTitle) workflowRunsTitle.textContent = workflow.name;
     const wfPRContext = document.getElementById('workflowRunsPRContext');
     if (wfPRContext) wfPRContext.textContent = prLabel ?? '';
@@ -664,6 +695,9 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     }
 
     currentWorkflowRuns = result.runs;
+    if (result.failedOnlyAttempts?.length) {
+        failedOnlyAttempts.set(workflow.runId, new Set(result.failedOnlyAttempts));
+    }
     const hasActiveRun = result.runs.some(r => r.status !== 'completed');
     workflowRunsRerunBtn.style.display = hasActiveRun ? 'none' : '';
     workflowRepeatInput.parentElement.style.display = hasActiveRun ? 'none' : '';
@@ -715,13 +749,31 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
                 btn.addEventListener('click', async (e) => {
                     btn.disabled = true;
                     btn.textContent = 'Starting…';
-                    const result2 = await window.api.rerunFailedJobsDirect({ owner, repo, runId: targetRun.runId });
+                    const previousAttemptCount = currentWorkflowRuns.length;
+                    const result2 = await window.api.rerunFailedJobsDirect({ owner, repo, runId: targetRun.runId, previousAttemptCount });
                     if (result2.error) {
                         btn.disabled = false;
                         btn.textContent = '↩ Rerun Failed Only';
                     } else {
-                        markFailedOnlyAttempt(targetRun.runId, currentWorkflowRuns.length + 1);
+                        const nextAttempt = currentWorkflowRuns.length + 1;
+                        markFailedOnlyAttempt(targetRun.runId, nextAttempt, owner, repo);
                         btn.remove();
+
+                        // Add placeholder so the user sees the new attempt immediately
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'pr-detail-run placeholder';
+                        placeholder.dataset.placeholder = 'true';
+                        placeholder.innerHTML = `
+                            <span class="status-dot idle"></span>
+                            <span class="pr-detail-run-name">#${nextAttempt} <span class="failed-only-badge">failed jobs only</span></span>
+                            <span class="pr-detail-run-status">Queued</span>
+                            <div class="pr-detail-run-actions"></div>
+                        `;
+                        workflowRunsList.prepend(placeholder);
+
+                        // Register pending rerun so auto-refresh keeps going
+                        inMemoryPendingRerun = { owner, repo, runId: targetRun.runId, fromAttempt: currentWorkflowRuns.length, total: 1 };
+                        window.api.savePendingRerun(inMemoryPendingRerun);
                     }
                 });
                 targetRow.querySelector('.pr-detail-run-actions').prepend(btn);
@@ -807,7 +859,11 @@ prDetailBack?.addEventListener('click', () => {
 });
 
 workflowRunsBack?.addEventListener('click', () => {
-    if (workflowRunsBackTarget === 'main') {
+    if (workflowRunsBackTarget === 'runs') {
+        switchPage('runs');
+        updateBreadcrumb('Runs', null);
+        currentView = 'main';
+    } else if (workflowRunsBackTarget === 'main') {
         updateBreadcrumb('Dashboard', null);
         showMainView();
     } else if (currentPR) {
@@ -838,7 +894,7 @@ workflowRunsReportBtn.addEventListener('click', () => {
 });
 
 function updatePinBtnState() {
-    if (!currentWorkflowRuns?.length || !currentPRContext) return;
+    if (!workflowRunsPinBtn || !currentWorkflowRuns?.length || !currentPRContext) return;
     const latestRunId = currentWorkflowRuns[0].runId;
     const isWatched = watchedRuns.has(latestRunId);
     workflowRunsPinBtn.textContent = isWatched ? '✓ Watching' : '⊕ Watch';
@@ -946,24 +1002,37 @@ window.api.onWorkflowRunAppeared(async ({ owner, repo, runId }) => {
 
 addBtn?.addEventListener('click', () => {
     switchPage('runs');
-    if (urlForm) {
-        urlForm.style.display = 'block';
-        if (urlInput) urlInput.focus();
-    }
+    openDock();
 });
 
 window.api.onOpenNewWatch(() => {
     switchPage('runs');
-    if (urlForm) {
-        urlForm.style.display = 'block';
-        if (urlInput) urlInput.focus();
-    }
+    openDock();
 });
 
-cancelBtn?.addEventListener('click', () => resetForm());
+watchDockTrigger?.addEventListener('click', openDock);
+urlFormClose?.addEventListener('click', closeDock);
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && urlForm?.style.display === 'block') closeDock();
+});
+
+cancelBtn?.addEventListener('click', () => closeDock());
 
 const prPicker = document.getElementById('prPicker');
 let selectedRunUrl = null;
+
+function openDock() {
+    if (watchDockTrigger) watchDockTrigger.style.display = 'none';
+    if (urlForm) urlForm.style.display = 'block';
+    if (urlInput) urlInput.focus();
+}
+
+function closeDock() {
+    if (urlForm) urlForm.style.display = 'none';
+    if (watchDockTrigger) watchDockTrigger.style.display = '';
+    resetForm();
+}
 
 function resetForm() {
     if (urlInput) urlInput.value = '';
@@ -1014,7 +1083,7 @@ watchBtn.addEventListener('click', async () => {
         }
         if (result.pinned) {
             addPinnedWorkflowCard(result.id, result.name, result.url, result.latestRunStatus, result.latestRunConclusion, result.latestRunUrl);
-            resetForm();
+            closeDock();
         }
         return;
     }
@@ -1096,7 +1165,7 @@ watchBtn.addEventListener('click', async () => {
         } else {
             addRunCard(result.runId, result.name, result.status, null, result.url, result.repeatTotal, 1, [], source);
         }
-        resetForm();
+        closeDock();
     }
 });
 
@@ -1163,7 +1232,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
         if (e.target.closest('button')) return;
         const parsed = parseGitHubRunUrl(url);
         if (!parsed) return;
-        openWorkflowRuns({ runId: parsed.runId, name }, { owner: parsed.owner, repo: parsed.repo }, 'main');
+        openWorkflowRuns({ runId: parsed.runId, name }, { owner: parsed.owner, repo: parsed.repo }, 'runs');
     });
     card.style.cursor = 'pointer';
 
@@ -1203,7 +1272,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
             if (e.target.closest('button')) return;
             const parsed = parseGitHubRunUrl(url);
             if (!parsed) return;
-            openWorkflowRuns({ runId: parsed.runId, name }, { owner: parsed.owner, repo: parsed.repo }, 'main');
+            openWorkflowRuns({ runId: parsed.runId, name }, { owner: parsed.owner, repo: parsed.repo }, 'runs');
         });
         cardClone.querySelector('.open-btn')?.addEventListener('click', () => window.api.openExternal(url));
         cardClone.querySelector('.cancel-run-btn')?.addEventListener('click', async (e) => {
@@ -1552,6 +1621,12 @@ function handleRoute() {
     const isLabRoute = hash === '/lab-runs' || !!labRunDetailMatch || !!runDetailMatch;
 
     if (!isLabRoute) return; // Not a lab-runs route — let existing navigation handle it
+
+    if (!featureFlags['lab-runs']) {
+        history.replaceState(null, '', window.location.pathname);
+        switchPage('home');
+        return;
+    }
 
     document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1974,3 +2049,127 @@ async function renderRunDetail(resultId) {
 
 // Handle hash on initial load (e.g. app opened with a deep link or refresh)
 if (window.location.hash) handleRoute();
+
+// ── Notification Center ────────────────────────────────────────────────────────
+
+let notifPanelOpen = false;
+
+function formatRelativeTime(isoString) {
+    const diff = Date.now() - new Date(isoString).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function updateNotifBadge(count) {
+    const badge = document.getElementById('notifBadge');
+    if (!badge) return;
+    if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function renderNotifItem(n) {
+    const dotClass = n.conclusion === 'success' ? 'success'
+        : ['failure', 'cancelled', 'timed_out'].includes(n.conclusion) ? 'failure'
+        : 'skipped';
+
+    const item = document.createElement('div');
+    item.className = `notif-item${n.read ? '' : ' unread'}`;
+    item.innerHTML = `
+        <span class="notif-dot ${escapeHtml(dotClass)}"></span>
+        <div class="notif-content">
+            <div class="notif-title">${escapeHtml(n.title)}</div>
+            <div class="notif-body">${escapeHtml(n.body)}</div>
+            ${n.url ? `<span class="notif-link" data-url="${escapeHtml(n.url)}">Open in GitHub →</span>` : ''}
+            <div class="notif-time">${formatRelativeTime(n.triggered_at)}</div>
+        </div>
+    `;
+
+    item.querySelector('.notif-link')?.addEventListener('click', () => {
+        window.api.openExternal(n.url);
+    });
+
+    return item;
+}
+
+async function loadNotifications() {
+    const list = document.getElementById('notifList');
+    if (!list) return;
+
+    const notifications = await window.api.getNotifications();
+    list.innerHTML = '';
+
+    if (!notifications.length) {
+        list.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+        return;
+    }
+
+    for (const n of notifications) {
+        list.appendChild(renderNotifItem(n));
+    }
+}
+
+async function openNotifPanel() {
+    notifPanelOpen = true;
+    document.getElementById('notifPanel')?.classList.add('open');
+    await loadNotifications();
+    // Mark as read after opening
+    await window.api.markNotificationsRead();
+    updateNotifBadge(0);
+}
+
+function closeNotifPanel() {
+    notifPanelOpen = false;
+    document.getElementById('notifPanel')?.classList.remove('open');
+}
+
+document.getElementById('notifBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (notifPanelOpen) closeNotifPanel();
+    else openNotifPanel();
+});
+
+document.getElementById('notifMarkRead')?.addEventListener('click', async () => {
+    await window.api.markNotificationsRead();
+    updateNotifBadge(0);
+    // Refresh the rendered list to remove unread styles
+    await loadNotifications();
+});
+
+document.getElementById('notifClear')?.addEventListener('click', async () => {
+    await window.api.clearNotifications();
+    updateNotifBadge(0);
+    const list = document.getElementById('notifList');
+    if (list) list.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+});
+
+// Close panel when clicking outside
+document.addEventListener('click', (e) => {
+    if (!notifPanelOpen) return;
+    const panel = document.getElementById('notifPanel');
+    const btn = document.getElementById('notifBtn');
+    if (panel && !panel.contains(e.target) && !btn?.contains(e.target)) {
+        closeNotifPanel();
+    }
+});
+
+// Listen for new notifications pushed from main
+window.api.onNotificationAdded((data) => {
+    updateNotifBadge(data.unreadCount);
+    if (notifPanelOpen) {
+        loadNotifications();
+    }
+});
+
+// Init: load unread count on startup
+(async () => {
+    const count = await window.api.getUnreadNotificationCount();
+    updateNotifBadge(count);
+})();

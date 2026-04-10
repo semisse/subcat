@@ -12,6 +12,7 @@ const runs = require('../../src/core/runs');
 const ipcAuth = require('./ipc/auth');
 const ipcRuns = require('./ipc/runs');
 const ipcReports = require('./ipc/reports');
+const ipcFlags = require('./ipc/flags');
 
 app.setName('SubCat');
 
@@ -82,7 +83,7 @@ const getToken = () => storage.loadToken() || undefined;
 
 // ─── Poller events → IPC + notifications ─────────────────────────────────────
 
-notifications.register(poller, getWindow);
+notifications.register(poller, getWindow, db);
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 
@@ -226,6 +227,7 @@ app.on('activate', () => {
 ipcAuth.register({ auth, storage, getWindow, getLoginWindow, setCurrentUser: u => { currentUser = u; }, createMainWindow, createLoginWindow });
 ipcRuns.register({ db, poller, storage, getWindow, getUser: () => currentUser });
 ipcReports.register({ db, getWindow });
+ipcFlags.register();
 
 // ─── IPC: misc ────────────────────────────────────────────────────────────────
 
@@ -261,3 +263,10 @@ ipcMain.handle('refresh-runs', () => {
     runs.resumeRuns({ db, poller, getToken, sendToWindow });
     runs.resumePinnedWorkflows({ db, getToken, sendToWindow });
 });
+
+// ─── IPC: notification center ─────────────────────────────────────────────────
+
+ipcMain.handle('get-notifications', () => db.getNotifications());
+ipcMain.handle('get-unread-notification-count', () => db.getUnreadNotificationCount());
+ipcMain.handle('mark-notifications-read', () => db.markAllNotificationsRead());
+ipcMain.handle('clear-notifications', () => db.clearNotifications());
