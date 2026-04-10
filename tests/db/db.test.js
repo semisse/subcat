@@ -15,7 +15,7 @@ beforeEach(() => {
     jest.resetModules();
     jest.mock('electron');
     jest.mock('better-sqlite3');
-    db = require('../db');
+    db = require('../../src/db');
 });
 
 // ─── schema ───────────────────────────────────────────────────────────────────
@@ -125,6 +125,27 @@ describe('getAllRuns', () => {
     });
 });
 
+// ─── getRun ───────────────────────────────────────────────────────────────────
+
+describe('getRun', () => {
+    test('returns null for an unknown id', () => {
+        expect(db.getRun('nonexistent')).toBeNull();
+    });
+
+    test('returns the run when it exists', () => {
+        db.addRun(RUN);
+        const run = db.getRun('1');
+        expect(run).not.toBeNull();
+        expect(run.id).toBe('1');
+        expect(run.owner).toBe('owner');
+    });
+
+    test('throws on duplicate id (UNIQUE constraint)', () => {
+        db.addRun(RUN);
+        expect(() => db.addRun(RUN)).toThrow(/UNIQUE constraint failed/);
+    });
+});
+
 // ─── removeRun ────────────────────────────────────────────────────────────────
 
 describe('removeRun', () => {
@@ -139,6 +160,63 @@ describe('removeRun', () => {
         db.addRunResult({ runId: '1', number: 1, conclusion: 'success', url: null, startedAt: null, completedAt: null, failedTests: [] });
         db.removeRun('1');
         expect(db.getRunResults('1')).toHaveLength(0);
+    });
+});
+
+// ─── clearRunResults ──────────────────────────────────────────────────────────
+
+describe('clearRunResults', () => {
+    beforeEach(() => db.addRun(RUN));
+
+    test('removes all results for a run', () => {
+        db.addRunResult({ runId: '1', number: 1, conclusion: 'success', url: null, startedAt: null, completedAt: null, failedTests: [] });
+        db.addRunResult({ runId: '1', number: 2, conclusion: 'failure', url: null, startedAt: null, completedAt: null, failedTests: [] });
+        db.clearRunResults('1');
+        expect(db.getRunResults('1')).toHaveLength(0);
+    });
+
+    test('does not remove the run itself', () => {
+        db.addRunResult({ runId: '1', number: 1, conclusion: 'success', url: null, startedAt: null, completedAt: null, failedTests: [] });
+        db.clearRunResults('1');
+        expect(db.getRun('1')).not.toBeNull();
+    });
+
+    test('is a no-op when there are no results', () => {
+        expect(() => db.clearRunResults('1')).not.toThrow();
+        expect(db.getRunResults('1')).toHaveLength(0);
+    });
+});
+
+// ─── pending_reruns ───────────────────────────────────────────────────────────
+
+describe('savePendingRerun / getPendingRerun / deletePendingRerun', () => {
+    const RERUN = { owner: 'owner', repo: 'repo', runId: '99', fromAttempt: 2, total: 5 };
+
+    test('saves and retrieves a pending rerun', () => {
+        db.savePendingRerun(RERUN);
+        const result = db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: '99' });
+        expect(result).toMatchObject({ owner: 'owner', repo: 'repo', run_id: '99', from_attempt: 2, total: 5 });
+    });
+
+    test('returns null when no pending rerun exists', () => {
+        expect(db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: 'nonexistent' })).toBeNull();
+    });
+
+    test('upserts on duplicate id', () => {
+        db.savePendingRerun(RERUN);
+        db.savePendingRerun({ ...RERUN, fromAttempt: 3 });
+        const result = db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: '99' });
+        expect(result.from_attempt).toBe(3);
+    });
+
+    test('deletes a pending rerun', () => {
+        db.savePendingRerun(RERUN);
+        db.deletePendingRerun({ owner: 'owner', repo: 'repo', runId: '99' });
+        expect(db.getPendingRerun({ owner: 'owner', repo: 'repo', runId: '99' })).toBeNull();
+    });
+
+    test('delete is a no-op when entry does not exist', () => {
+        expect(() => db.deletePendingRerun({ owner: 'owner', repo: 'repo', runId: 'ghost' })).not.toThrow();
     });
 });
 

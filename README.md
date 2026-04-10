@@ -30,6 +30,24 @@ Download the latest `.dmg` from [Releases](../../releases), open it, and drag Su
 - Runs persist across restarts — pick up where you left off
 - Token encrypted via macOS Keychain (`safeStorage`)
 
+## Feature flags
+
+Some features are hidden behind flags stored in `~/Library/Application Support/SubCat/feature-flags.json`. The file is created automatically on first run.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `lab-runs` | `false` | Lab Runs section — run stability checks and flakiness analysis |
+
+To enable a flag, edit the file directly:
+
+```json
+{
+  "lab-runs": true
+}
+```
+
+Then restart the app.
+
 ## Dev setup
 
 ```bash

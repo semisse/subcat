@@ -1,13 +1,22 @@
-let poller, github, db;
+let PollManager, github, db, poller;
+
+function makeDbMock() {
+    return {
+        addRunResult: jest.fn(),
+        updateRun: jest.fn(),
+        removeRun: jest.fn(),
+        clearRunResults: jest.fn(),
+    };
+}
 
 beforeEach(() => {
     jest.resetModules();
-    jest.mock('../github');
-    jest.mock('../db');
-    github = require('../github');
-    db = require('../db');
+    jest.mock('../../src/core/github');
+    github = require('../../src/core/github');
     github.delay.mockResolvedValue(undefined);
-    poller = require('../poller');
+    PollManager = require('../../src/core/poller');
+    db = makeDbMock();
+    poller = new PollManager(db);
 });
 
 function makeRun(overrides = {}) {
@@ -157,6 +166,60 @@ describe('repeat runs', () => {
         await tick();
 
         expect(allDone).toHaveBeenCalledWith(expect.objectContaining({ passed: 0, failed: 2 }));
+    });
+});
+
+// ─── watchAttempt ─────────────────────────────────────────────────────────────
+
+describe('watchAttempt', () => {
+    test('emits run:new-attempt when attempt count increases', async () => {
+        github.githubGet
+            .mockResolvedValueOnce({ run_attempt: 2 });
+
+        const onNewAttempt = jest.fn();
+        poller.on('run:new-attempt', onNewAttempt);
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '1', previousAttemptCount: 1 }, () => 'token');
+        await tick();
+
+        expect(onNewAttempt).toHaveBeenCalledWith({ owner: 'owner', repo: 'repo', runId: '1' });
+    });
+
+    test('does not emit when attempt count has not changed', async () => {
+        github.githubGet
+            .mockResolvedValueOnce({ run_attempt: 1 })
+            .mockResolvedValueOnce({ run_attempt: 2 });
+
+        const onNewAttempt = jest.fn();
+        poller.on('run:new-attempt', onNewAttempt);
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '2', previousAttemptCount: 1 }, () => 'token');
+        await tick(); // first poll: no change
+        await tick(); // second poll: new attempt
+
+        expect(onNewAttempt).toHaveBeenCalledTimes(1);
+    });
+
+    test('second watchAttempt call for same runId is a no-op', async () => {
+        github.githubGet.mockResolvedValue({ run_attempt: 2 });
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '3', previousAttemptCount: 1 }, () => 'token');
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '3', previousAttemptCount: 1 }, () => 'token');
+        await tick();
+
+        expect(github.githubGet).toHaveBeenCalledTimes(1);
+    });
+
+    test('stops on non-transient error without emitting', async () => {
+        github.githubGet.mockRejectedValue(new Error('server error'));
+
+        const onNewAttempt = jest.fn();
+        poller.on('run:new-attempt', onNewAttempt);
+
+        poller.watchAttempt({ owner: 'owner', repo: 'repo', runId: '4', previousAttemptCount: 1 }, () => 'token');
+        await tick();
+
+        expect(onNewAttempt).not.toHaveBeenCalled();
     });
 });
 

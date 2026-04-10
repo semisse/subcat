@@ -22,7 +22,7 @@ jobs:
 
       - run: npm test
 
-  build:
+  build-mac:
     needs: test
     runs-on: macos-14
     permissions:
@@ -46,3 +46,27 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: 49Y5FW82WK
+
+  build-linux:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (ignore postinstall scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Rebuild native dependencies
+        run: npm rebuild better-sqlite3
+
+      - name: Build and publish Linux artifacts
+        run: npm run build:linux -- --publish always
+        env:
+          GH_TOKEN: ${{ github.token }}
