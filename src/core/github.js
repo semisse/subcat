@@ -40,7 +40,7 @@ async function fetchUserPRs(login, token) {
     return data.items.map(pr => {
         const repoPath = pr.repository_url.replace('https://api.github.com/repos/', '');
         const [owner, repo] = repoPath.split('/');
-        return { number: pr.number, title: pr.title, owner, repo, url: pr.html_url };
+        return { number: pr.number, title: pr.title, owner, repo, url: pr.html_url, comments: pr.comments ?? 0 };
     });
 }
 
@@ -222,6 +222,21 @@ function rerunFailedJobs(owner, repo, runId, token) {
     });
 }
 
+async function fetchRunJobs(owner, repo, runId, attemptNumber, token) {
+    const path = attemptNumber != null
+        ? `/repos/${owner}/${repo}/actions/runs/${runId}/attempts/${attemptNumber}/jobs`
+        : `/repos/${owner}/${repo}/actions/runs/${runId}/jobs`;
+    const data = await githubGet(path, token);
+    return (data.jobs ?? []).map(j => ({
+        id: j.id,
+        name: j.name,
+        status: j.status,
+        conclusion: j.conclusion,
+        startedAt: j.started_at,
+        completedAt: j.completed_at,
+    }));
+}
+
 async function fetchPRReviews(owner, repo, prNumber, token) {
     const reviews = await githubGet(`/repos/${owner}/${repo}/pulls/${prNumber}/reviews`, token);
     // Last non-comment state per reviewer wins
@@ -237,4 +252,4 @@ async function fetchPRReviews(owner, repo, prNumber, token) {
     };
 }
 
-module.exports = { delay, parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, fetchWorkflowInfo, fetchLatestWorkflowRun, fetchPRReviews, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };
+module.exports = { delay, parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, fetchWorkflowInfo, fetchLatestWorkflowRun, fetchPRReviews, fetchRunJobs, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

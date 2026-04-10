@@ -117,6 +117,27 @@ function register({ db, poller, storage, getWindow, getUser }) {
             return { error: e.message };
         }
     });
+
+    handle('get-lab-runs', async () => {
+        try { return db.getLabRuns(); } catch (e) { return { error: e.message }; }
+    });
+
+    handle('get-run-results-for-run', async (event, runId) => {
+        try { return db.getRunResults(runId); } catch (e) { return { error: e.message }; }
+    });
+
+    handle('get-run-result', async (event, id) => {
+        try { return db.getRunResultById(id); } catch (e) { return { error: e.message }; }
+    });
+
+    handle('fetch-run-jobs', async (event, opts) => {
+        try {
+            const jobs = await runs.fetchRunJobsHandler(opts, { getToken });
+            return { jobs };
+        } catch (e) {
+            return { error: e.message };
+        }
+    });
 }
 
 module.exports = { register };

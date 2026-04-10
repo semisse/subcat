@@ -1,14 +1,15 @@
+const github = require('./github');
 const {
     parseGitHubUrl, parsePRUrl, parseWorkflowUrl,
     fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests,
     fetchWorkflowInfo, fetchLatestWorkflowRun, fetchPRReviews,
     rerunWorkflow, rerunFailedJobs, cancelRun,
-} = require('./github');
+} = github;
 
 const PINNED_POLL_INTERVAL_MS = 30_000;
 const pinnedPollers = new Map();
 
-async function startWatching({ url, repeatTotal = 1, source = 'manual' }, { db, poller, getToken }) {
+async function startWatching({ url, repeatTotal = 1, source = 'manual', prNumber = null, prTitle = null, headSha = null }, { db, poller, getToken }) {
     const parsed = parseGitHubUrl(url);
     if (!parsed) {
         return { error: 'Invalid GitHub Actions URL. Expected format: https://github.com/{owner}/{repo}/actions/runs/{run_id}' };
@@ -36,7 +37,7 @@ async function startWatching({ url, repeatTotal = 1, source = 'manual' }, { db, 
             const failedTests = initial.conclusion !== 'success'
                 ? await fetchFailedTests(owner, repo, runId, getToken()).catch(() => [])
                 : [];
-            db.addRun({ id: runId, currentRunId: runId, owner, repo, workflowId: initial.workflow_id, name, url: initial.html_url, repeatTotal: 1, runNumber: 1, source });
+            db.addRun({ id: runId, currentRunId: runId, owner, repo, workflowId: initial.workflow_id, name, url: initial.html_url, repeatTotal: 1, runNumber: 1, source, prNumber, prTitle, headSha });
             db.addRunResult({ runId, number: 1, conclusion: initial.conclusion, url: initial.html_url, startedAt: initial.run_started_at, completedAt: initial.updated_at, failedTests });
             db.updateRun(runId, { status: 'completed' });
             return {
@@ -71,6 +72,9 @@ async function startWatching({ url, repeatTotal = 1, source = 'manual' }, { db, 
             repeatTotal: repeat,
             runNumber,
             source,
+            prNumber,
+            prTitle,
+            headSha,
         });
 
         poller.start({ runId, currentRunId, owner, repo, runNumber, repeatTotal: repeat, name: initial.display_title || initial.name, url: initial.html_url }, getToken);
@@ -373,6 +377,10 @@ function resumePinnedWorkflows({ db, getToken, sendToWindow }) {
     }
 }
 
+async function fetchRunJobsHandler({ owner, repo, runId, attemptNumber }, { getToken }) {
+    return github.fetchRunJobs(owner, repo, runId, attemptNumber ?? null, getToken());
+}
+
 module.exports = {
     startWatching,
     stopWatching,
@@ -383,6 +391,7 @@ module.exports = {
     fetchPRRunsHandler,
     fetchRunAttemptsHandler,
     fetchPRReviewsHandler,
+    fetchRunJobsHandler,
     rerunRunDirect,
     rerunFailedJobsDirect,
     cancelRunDirect,

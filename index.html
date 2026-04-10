@@ -954,6 +954,52 @@
             font-weight: 500;
         }
 
+        .pr-item-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        .pr-meta-chip {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 50px;
+            background: rgba(139, 139, 158, 0.12);
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .pr-meta-chip.muted {
+            opacity: 0.5;
+        }
+
+        .pr-meta-chip.review-approved {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        .pr-meta-chip.review-changes {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+        }
+
+        .pr-meta-chip.review-pending {
+            background: rgba(139, 139, 158, 0.12);
+            color: var(--text-secondary);
+        }
+
+        .pr-loading-spinner-sm {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border: 1.5px solid var(--border-color);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
         .pr-item-badge {
             display: flex;
             align-items: center;
@@ -1085,6 +1131,31 @@
             flex: 1;
         }
 
+        .detail-title-stack {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .detail-title-stack .detail-title {
+            flex: unset;
+        }
+
+        .detail-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .detail-subtitle:empty {
+            display: none;
+        }
+
         .detail-actions {
             display: flex;
             gap: 10px;
@@ -1133,6 +1204,26 @@
             border: 1px solid var(--border-color);
             border-radius: var(--radius-lg);
             overflow: hidden;
+        }
+
+        .pr-detail-loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 24px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .pr-detail-spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            flex-shrink: 0;
         }
 
         .detail-list-item,
@@ -1723,6 +1814,289 @@
         .run-card.completed-success { border-left: 3px solid var(--accent-green); }
         .run-card.completed-failure { border-left: 3px solid var(--accent-red); }
         .run-card.in-progress { border-left: 3px solid var(--accent-yellow); }
+
+        /* ── Lab Runs ───────────────────────────────────────────────── */
+        .lab-runs-page-header {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .lab-runs-page-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .lab-runs-page-header .lab-runs-count {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .lab-runs-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 80px 24px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .lab-run-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .lab-run-item:hover { background: var(--bg-card-hover); border-color: var(--border-color-hover); }
+        .lab-run-item-left { flex: 1; min-width: 0; }
+        .lab-run-item-pr {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+        .lab-run-item-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lab-run-item-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .lab-run-status-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .lab-run-status-badge.running { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
+        .lab-run-status-badge.completed { background: var(--accent-green-dim); color: var(--accent-green); }
+        .lab-run-status-badge.cancelled { background: var(--bg-tertiary); color: var(--text-muted); }
+        .lab-run-status-badge.error { background: var(--accent-red-dim); color: var(--accent-red); }
+        .lab-run-progress-text { font-size: 12px; color: var(--text-muted); }
+        .lab-run-result { font-size: 12px; font-weight: 600; }
+        .lab-run-result.stable { color: var(--accent-green); }
+        .lab-run-result.flaky { color: var(--accent-red); }
+        .lab-run-result.probably-flaky { color: var(--accent-yellow); }
+        .lab-run-confidence { font-size: 11px; color: var(--text-muted); }
+        .lab-run-item-arrow { color: var(--text-muted); font-size: 18px; flex-shrink: 0; }
+
+        /* ── Lab Run Detail ─────────────────────────────────────────── */
+        .detail-page-back {
+            margin-bottom: 20px;
+        }
+        .detail-page-back button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            padding: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.15s;
+        }
+        .detail-page-back button:hover { color: var(--text-primary); }
+
+        .lab-run-detail-header {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .lab-run-detail-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .lab-run-detail-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .lab-run-detail-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .lab-run-detail-meta-item strong { color: var(--text-primary); }
+        .lab-run-sha {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--accent-purple-light);
+        }
+
+        .lab-run-progress-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .lab-run-progress-bar-track {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .lab-run-progress-bar-fill {
+            height: 100%;
+            background: var(--accent-purple);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .lab-run-progress-bar-fill.done { background: var(--accent-green); }
+        .lab-run-progress-bar-fill.has-failures { background: var(--accent-red); }
+        .lab-run-progress-label { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+
+        .lab-run-counters {
+            display: flex;
+            gap: 20px;
+        }
+        .lab-run-counter { font-size: 13px; color: var(--text-secondary); }
+        .lab-run-counter span { font-weight: 700; }
+        .lab-run-counter.pass span { color: var(--accent-green); }
+        .lab-run-counter.fail span { color: var(--accent-red); }
+        .lab-run-counter.pending span { color: var(--accent-yellow); }
+
+        .lab-run-detail-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .lab-run-section {
+            margin-bottom: 28px;
+        }
+        .lab-run-section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 12px;
+        }
+
+        .run-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .run-row:hover { background: var(--bg-card-hover); border-color: var(--border-color-hover); }
+        .run-row-number { font-size: 14px; font-weight: 600; color: var(--text-primary); min-width: 40px; }
+        .run-row-status { font-size: 13px; color: var(--text-secondary); flex: 1; }
+        .run-row-conclusion { font-size: 13px; font-weight: 600; }
+        .run-row-conclusion.success { color: var(--accent-green); }
+        .run-row-conclusion.failure { color: var(--accent-red); }
+        .run-row-conclusion.cancelled { color: var(--text-muted); }
+        .run-row-arrow { color: var(--text-muted); font-size: 18px; }
+
+        .jobs-summary-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .jobs-summary-name { color: var(--text-primary); flex: 1; }
+        .jobs-summary-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+        .jobs-summary-badge.stable { background: var(--accent-green-dim); color: var(--accent-green); }
+        .jobs-summary-badge.failures { background: var(--accent-red-dim); color: var(--accent-red); }
+
+        .timeline-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 12px 0;
+        }
+        .timeline-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            border: 2px solid transparent;
+            cursor: default;
+        }
+        .timeline-dot.success { background: var(--accent-green-dim); border-color: var(--accent-green); }
+        .timeline-dot.failure { background: var(--accent-red-dim); border-color: var(--accent-red); }
+        .timeline-dot.pending { background: var(--accent-yellow-dim); border-color: var(--accent-yellow); }
+
+        /* ── Run Detail ─────────────────────────────────────────────── */
+        .run-detail-header-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .run-detail-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        .run-detail-status { font-size: 14px; color: var(--text-secondary); }
+        .run-detail-status.success { color: var(--accent-green); }
+        .run-detail-status.failure { color: var(--accent-red); }
+
+        .job-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .job-item-name { flex: 1; color: var(--text-primary); }
+        .job-item-status { color: var(--text-secondary); }
+        .job-item-status.success { color: var(--accent-green); }
+        .job-item-status.failure { color: var(--accent-red); }
+        .job-item-status.in_progress { color: var(--accent-yellow); }
+        .job-item-status.skipped { color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -1752,6 +2126,12 @@
                 </svg>
                 Reports
             </a>
+            <a href="#/lab-runs" class="nav-item" id="navLabRuns">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                </svg>
+                Lab Runs
+            </a>
 
         </nav>
         <div class="sidebar-footer">
@@ -1775,6 +2155,8 @@
                     <span class="breadcrumb-item" id="breadcrumbPage1"></span>
                     <span class="breadcrumb-separator" id="sep1" style="display:none;">/</span>
                     <span class="breadcrumb-item" id="breadcrumbPage2"></span>
+                    <span class="breadcrumb-separator" id="sep2" style="display:none;">/</span>
+                    <span class="breadcrumb-item" id="breadcrumbPage3" style="display:none;"></span>
                 </div>
             </div>
             <div class="top-bar-right">
@@ -1890,10 +2272,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="pr-most-expensive" id="prMostExpensive" style="display:none;">
-                        <span class="pr-most-expensive-icon">💸</span>
-                        <span class="pr-most-expensive-text" id="statMostExpensive"></span>
-                    </div>
                 </div>
 
                 <div class="runs-list" id="runsList">
@@ -1941,19 +2319,27 @@
                             <button class="primary">↩ Rerun</button>
                         </div>
                     </div>
+                    <div class="pr-detail-loading" id="prDetailLoading" style="display:none;">
+                        <span class="pr-detail-spinner"></span>
+                        <span>Loading workflows…</span>
+                    </div>
+                    <div class="section-label" id="prDetailSubtitle" style="display:none;">Workflows</div>
                     <div class="detail-list" id="prDetailList"></div>
                 </div>
 
                 <div class="detail-view" id="workflowRunsView">
                     <div class="detail-header">
                         <button class="back-btn" id="workflowRunsBack">←</button>
-                        <span class="detail-title" id="workflowRunsTitle"></span>
+                        <div class="detail-title-stack">
+                            <span class="detail-subtitle" id="workflowRunsPRContext"></span>
+                            <span class="detail-title" id="workflowRunsTitle"></span>
+                        </div>
                         <div class="detail-actions">
                             <div class="repeat-field" style="background: var(--bg-tertiary);">
                                 <span class="repeat-label">×</span>
                                 <input type="number" id="workflowRepeatInput" value="1" min="1" max="100">
                             </div>
-                            <button class="primary" id="workflowRunsRerunBtn">↩ Rerun</button>
+                            <button class="primary" id="workflowRunsRerunBtn">↩ Rerun All</button>
                             <button id="workflowRunsCancelAllBtn" style="display:none;">Cancel all</button>
                             <button id="workflowRunsReportBtn">Report</button>
                         </div>
@@ -1992,6 +2378,47 @@
                     <div class="saved-reports-list" id="savedReportsList">
                         <div class="saved-reports-empty">No reports saved yet. Save a report from a run to see it here.</div>
                     </div>
+                </div>
+            </section>
+
+            <!-- Lab Runs List Page -->
+            <section class="page-section" id="pageLabRuns">
+                <div class="lab-runs-page-header">
+                    <h2>Lab Runs</h2>
+                    <span class="lab-runs-count" id="labRunsCount"></span>
+                </div>
+                <div id="labRunsList"></div>
+            </section>
+
+            <!-- Lab Run Detail Page -->
+            <section class="page-section" id="pageLabRunDetail">
+                <div class="detail-page-back">
+                    <button id="labRunDetailBack">← Lab Runs</button>
+                </div>
+                <div class="lab-run-detail-header" id="labRunDetailHeader"></div>
+                <div class="lab-run-section">
+                    <div class="lab-run-section-title">Runs</div>
+                    <div id="labRunRunsList"></div>
+                </div>
+                <div class="lab-run-section">
+                    <div class="lab-run-section-title">Jobs Summary</div>
+                    <div id="labRunJobsSummary"></div>
+                </div>
+                <div class="lab-run-section">
+                    <div class="lab-run-section-title">Timeline</div>
+                    <div class="timeline-row" id="labRunTimeline"></div>
+                </div>
+            </section>
+
+            <!-- Run Detail Page -->
+            <section class="page-section" id="pageRunDetail">
+                <div class="detail-page-back">
+                    <button id="runDetailBack">← Lab Run</button>
+                </div>
+                <div class="run-detail-header-card" id="runDetailHeader"></div>
+                <div class="lab-run-section">
+                    <div class="lab-run-section-title">Jobs</div>
+                    <div id="runDetailJobs"></div>
                 </div>
             </section>
 

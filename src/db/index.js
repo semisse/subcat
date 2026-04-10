@@ -63,6 +63,10 @@ function migrate(db) {
         db.exec(`ALTER TABLE runs ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`);
     } catch (_) { /* column already exists */ }
 
+    try { db.exec(`ALTER TABLE runs ADD COLUMN pr_number INTEGER`); } catch (_) {}
+    try { db.exec(`ALTER TABLE runs ADD COLUMN pr_title TEXT`); } catch (_) {}
+    try { db.exec(`ALTER TABLE runs ADD COLUMN head_sha TEXT`); } catch (_) {}
+
     db.exec(`
         CREATE TABLE IF NOT EXISTS pending_reruns (
             id TEXT PRIMARY KEY,
@@ -90,11 +94,11 @@ function migrate(db) {
     `);
 }
 
-function addRun({ id, currentRunId, owner, repo, workflowId, name, url, repeatTotal, runNumber, source = 'manual' }) {
+function addRun({ id, currentRunId, owner, repo, workflowId, name, url, repeatTotal, runNumber, source = 'manual', prNumber = null, prTitle = null, headSha = null }) {
     getDb().prepare(`
-        INSERT INTO runs (id, current_run_id, owner, repo, workflow_id, name, url, repeat_total, run_number, status, source, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'watching', ?, ?)
-    `).run(id, currentRunId, owner, repo, workflowId ?? null, name, url, repeatTotal, runNumber, source, new Date().toISOString());
+        INSERT INTO runs (id, current_run_id, owner, repo, workflow_id, name, url, repeat_total, run_number, status, source, pr_number, pr_title, head_sha, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'watching', ?, ?, ?, ?, ?)
+    `).run(id, currentRunId, owner, repo, workflowId ?? null, name, url, repeatTotal, runNumber, source, prNumber, prTitle, headSha, new Date().toISOString());
 }
 
 function updateRun(id, { currentRunId, runNumber, status, name, url } = {}) {
@@ -214,6 +218,25 @@ function deleteSavedReport(id) {
     getDb().prepare(`DELETE FROM saved_reports WHERE id = ?`).run(id);
 }
 
+function getLabRuns() {
+    return getDb().prepare(`
+        SELECT r.*,
+            COUNT(rr.id) AS completed_count,
+            SUM(CASE WHEN rr.conclusion = 'success' THEN 1 ELSE 0 END) AS passed_count,
+            SUM(CASE WHEN rr.conclusion != 'success' AND rr.conclusion IS NOT NULL THEN 1 ELSE 0 END) AS failed_count
+        FROM runs r
+        LEFT JOIN run_results rr ON r.id = rr.run_id
+        GROUP BY r.id
+        ORDER BY r.created_at DESC
+    `).all();
+}
+
+function getRunResultById(id) {
+    const r = getDb().prepare(`SELECT * FROM run_results WHERE id = ?`).get(id);
+    if (!r) return null;
+    return { ...r, failedTests: JSON.parse(r.failed_tests ?? '[]') };
+}
+
 function getPRStats() {
     const db = getDb();
     
@@ -259,4 +282,4 @@ function getPRStats() {
     };
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, getPRStats, addSavedReport, getAllSavedReports, deleteSavedReport };
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, getPRStats, addSavedReport, getAllSavedReports, deleteSavedReport, getLabRuns, getRunResultById };
