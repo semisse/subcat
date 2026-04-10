@@ -59,4 +59,14 @@ contextBridge.exposeInMainWorld('api', {
     onUpdateDownloadProgress: (cb) => ipcRenderer.on('update-download-progress', (_, data) => cb(data)),
     onUpdateReady: (cb) => ipcRenderer.on('update-ready', (_, data) => cb(data)),
     installUpdate: () => ipcRenderer.invoke('install-update'),
+
+    // Lab Test
+    startLocalRun: (opts) => ipcRenderer.invoke('local-run:start', opts),
+    stopLocalRun: (id) => ipcRenderer.invoke('local-run:stop', { id }),
+    checkDocker: () => ipcRenderer.invoke('local-run:check-docker'),
+    detectLabImage: (repoPath) => ipcRenderer.invoke('local-run:detect-image', { repoPath }),
+    browseFolder: () => ipcRenderer.invoke('local-run:browse-folder'),
+    onLocalRunOutput: (cb) => ipcRenderer.on('local-run:output', (_, data) => cb(data)),
+    onLocalRunProgress: (cb) => ipcRenderer.on('local-run:progress', (_, data) => cb(data)),
+    onLocalRunDone: (cb) => ipcRenderer.on('local-run:done', (_, data) => cb(data)),
 });

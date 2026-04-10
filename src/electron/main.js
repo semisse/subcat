@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, dialog } = require('electron');
 
-app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
+app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication,AutofillAddressProfileSavePrompt');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -15,6 +15,7 @@ const ipcAuth = require('./ipc/auth');
 const ipcRuns = require('./ipc/runs');
 const ipcReports = require('./ipc/reports');
 const ipcFlags = require('./ipc/flags');
+const ipcLocalRunner = require('./ipc/local-runner');
 
 app.setName('SubCat');
 
@@ -252,6 +253,7 @@ ipcAuth.register({ auth, storage, getWindow, getLoginWindow, setCurrentUser: u =
 ipcRuns.register({ db, poller, storage, getWindow, getUser: () => currentUser });
 ipcReports.register({ db, getWindow });
 ipcFlags.register();
+ipcLocalRunner.register({ db, getWindow });
 
 // ─── IPC: misc ────────────────────────────────────────────────────────────────
 

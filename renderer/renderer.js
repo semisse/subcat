@@ -4,6 +4,7 @@ const pageTitles = {
     'my-prs': 'My PRs',
     'runs': 'Runs',
     'reports': 'Reports',
+    'lab-test': 'Lab Test',
     'profile': 'Profile'
 };
 
@@ -55,6 +56,7 @@ function switchPage(page) {
     updateBreadcrumb(pageTitles[page], null);
 
     if (page === 'reports') loadSavedReports();
+    if (page === 'lab-test') initLabTestPage();
 }
 
 async function loadSavedReports() {
@@ -216,6 +218,7 @@ initFeatureFlags();
 initUser();
 loadUserPRs();
 loadPRStats();
+initLabTest();
 
 // ── PRs ─ see renderer/pages/prs.js ─ Dashboard ─ see renderer/pages/dashboard.js ──
 
