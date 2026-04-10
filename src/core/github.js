@@ -1,4 +1,7 @@
-const https = require('https');
+const SUBCAT_API_HOST = process.env.SUBCAT_API_HOST || 'api.github.com';
+const SUBCAT_API_PORT = process.env.SUBCAT_API_PORT ? parseInt(process.env.SUBCAT_API_PORT, 10) : undefined;
+const SUBCAT_API_PROTOCOL = process.env.SUBCAT_API_PROTOCOL || 'https';
+const transport = require(SUBCAT_API_PROTOCOL);
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -95,8 +98,9 @@ async function fetchRunAttempts(owner, repo, runId, token) {
 
 function githubGet(path, token) {
     return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: 'api.github.com',
+        const req = transport.request({
+            hostname: SUBCAT_API_HOST,
+            ...(SUBCAT_API_PORT && { port: SUBCAT_API_PORT }),
             path,
             method: 'GET',
             headers: {
@@ -147,8 +151,9 @@ async function fetchFailedTests(owner, repo, runId, token) {
 
 function triggerRerun(owner, repo, runId, token) {
     return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: 'api.github.com',
+        const req = transport.request({
+            hostname: SUBCAT_API_HOST,
+            ...(SUBCAT_API_PORT && { port: SUBCAT_API_PORT }),
             path: `/repos/${owner}/${repo}/actions/runs/${runId}/rerun`,
             method: 'POST',
             headers: {
@@ -171,8 +176,9 @@ function triggerRerun(owner, repo, runId, token) {
 
 function cancelRun(owner, repo, runId, token) {
     return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: 'api.github.com',
+        const req = transport.request({
+            hostname: SUBCAT_API_HOST,
+            ...(SUBCAT_API_PORT && { port: SUBCAT_API_PORT }),
             path: `/repos/${owner}/${repo}/actions/runs/${runId}/cancel`,
             method: 'POST',
             headers: {
@@ -200,8 +206,9 @@ async function rerunWorkflow(owner, repo, runId, token) {
 
 function rerunFailedJobs(owner, repo, runId, token) {
     return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: 'api.github.com',
+        const req = transport.request({
+            hostname: SUBCAT_API_HOST,
+            ...(SUBCAT_API_PORT && { port: SUBCAT_API_PORT }),
             path: `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
             method: 'POST',
             headers: {

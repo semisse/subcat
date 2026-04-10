@@ -18,6 +18,11 @@ const ipcFlags = require('./ipc/flags');
 
 app.setName('SubCat');
 
+if (process.env.SUBCAT_E2E) {
+    const os = require('os');
+    app.setPath('userData', require('fs').mkdtempSync(path.join(os.tmpdir(), 'subcat-e2e-')));
+}
+
 const isMac = process.platform === 'darwin';
 
 if (isMac) {
@@ -192,7 +197,7 @@ app.on('window-all-closed', () => {
 
 // ─── Auto-update ──────────────────────────────────────────────────────────────
 
-if (process.env.NODE_ENV !== 'development') {
+if (process.env.NODE_ENV !== 'development' && !process.env.SUBCAT_E2E) {
     autoUpdater.checkForUpdates();
 
     autoUpdater.on('update-available', (info) => {
