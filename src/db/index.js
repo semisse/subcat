@@ -74,6 +74,20 @@ function migrate(db) {
             created_at TEXT NOT NULL
         );
     `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS saved_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            type TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            total INTEGER NOT NULL DEFAULT 0,
+            passed INTEGER NOT NULL DEFAULT 0,
+            failed INTEGER NOT NULL DEFAULT 0,
+            flakiness TEXT NOT NULL DEFAULT 'Stable',
+            saved_at TEXT NOT NULL
+        );
+    `);
 }
 
 function addRun({ id, currentRunId, owner, repo, workflowId, name, url, repeatTotal, runNumber, source = 'manual' }) {
@@ -185,6 +199,21 @@ function deletePendingRerun({ owner, repo, runId }) {
     getDb().prepare(`DELETE FROM pending_reruns WHERE id = ?`).run(id);
 }
 
+function addSavedReport({ title, type, filePath, total, passed, failed, flakiness }) {
+    return getDb().prepare(`
+        INSERT INTO saved_reports (title, type, file_path, total, passed, failed, flakiness, saved_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(title, type, filePath, total, passed, failed, flakiness, new Date().toISOString());
+}
+
+function getAllSavedReports() {
+    return getDb().prepare(`SELECT * FROM saved_reports ORDER BY saved_at DESC`).all();
+}
+
+function deleteSavedReport(id) {
+    getDb().prepare(`DELETE FROM saved_reports WHERE id = ?`).run(id);
+}
+
 function getPRStats() {
     const db = getDb();
     
@@ -230,4 +259,4 @@ function getPRStats() {
     };
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, getPRStats };
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, getPRStats, addSavedReport, getAllSavedReports, deleteSavedReport };

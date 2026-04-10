@@ -233,6 +233,10 @@ ipcMain.handle('open-external', async (event, url) => {
     if (url.startsWith('https://github.com/')) shell.openExternal(url);
 });
 
+ipcMain.handle('reveal-in-finder', (event, filePath) => {
+    shell.showItemInFolder(filePath);
+});
+
 ipcMain.handle('get-version', () => app.getVersion());
 
 ipcMain.handle('show-about', () => {

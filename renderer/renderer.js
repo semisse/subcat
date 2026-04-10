@@ -45,12 +45,63 @@ function updateBreadcrumb(page1, page2) {
 function switchPage(page) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
-    
+
     document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
     const pageId = page === 'my-prs' ? 'pageMyprs' : `page${page.charAt(0).toUpperCase() + page.slice(1).replace('-', '')}`;
     document.getElementById(pageId)?.classList.add('active');
-    
+
     updateBreadcrumb(pageTitles[page], null);
+
+    if (page === 'reports') loadSavedReports();
+}
+
+async function loadSavedReports() {
+    const list = document.getElementById('savedReportsList');
+    if (!list) return;
+
+    const reports = await window.api.getSavedReports();
+    list.innerHTML = '';
+
+    if (!reports.length) {
+        list.innerHTML = '<div class="saved-reports-empty">No reports saved yet. Save a report from a run to see it here.</div>';
+        return;
+    }
+
+    for (const r of reports) {
+        const badgeClass = r.flakiness === 'Stable' ? 'stable'
+            : r.flakiness.startsWith('Probably') ? 'probably-flaky'
+            : 'flaky';
+
+        const date = new Date(r.saved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const fileName = r.file_path.split('/').pop();
+
+        const item = document.createElement('div');
+        item.className = 'saved-report-item';
+        item.dataset.id = r.id;
+        item.innerHTML = `
+            <div class="saved-report-title" title="${escapeHtml(r.file_path)}">${escapeHtml(r.title)}</div>
+            <span class="saved-report-badge ${badgeClass}">${escapeHtml(r.flakiness)}</span>
+            <div class="saved-report-meta">${r.passed}✅ ${r.failed}❌ · ${escapeHtml(date)}</div>
+            <div class="saved-report-actions">
+                <button class="reveal-btn" title="Show in Finder">Show in Finder</button>
+                <button class="delete-btn" title="Remove from list">Remove</button>
+            </div>
+        `;
+
+        item.querySelector('.reveal-btn').addEventListener('click', () => {
+            window.api.revealInFinder(r.file_path);
+        });
+
+        item.querySelector('.delete-btn').addEventListener('click', async () => {
+            await window.api.deleteSavedReport(r.id);
+            item.remove();
+            if (!list.children.length) {
+                list.innerHTML = '<div class="saved-reports-empty">No reports saved yet. Save a report from a run to see it here.</div>';
+            }
+        });
+
+        list.appendChild(item);
+    }
 }
 
 document.getElementById('sidebarUser')?.addEventListener('click', () => {
@@ -366,42 +417,35 @@ function getRunsListPage() {
 function showMainView() {
     clearLevel3Poll();
     currentView = 'main';
-    if (myPrsList) myPrsList.style.display = '';
-    if (prDetailList) { prDetailList.style.display = 'none'; prDetailList.innerHTML = ''; }
-    if (workflowRunsList) workflowRunsList.style.display = 'none';
+    switchPage('home');
+    document.getElementById('workflowRunsView')?.classList.remove('active');
+    document.getElementById('prDetailView')?.classList.remove('active');
+    document.getElementById('prListView')?.classList.add('active');
     if (prDetailNav) prDetailNav.style.display = 'none';
     if (workflowRunsNav) workflowRunsNav.style.display = 'none';
-    if (myPrsNav) myPrsNav.style.display = 'flex';
     if (prDetailTitle) prDetailTitle.textContent = '';
-    if (runsList) runsList.style.display = '';
-    if (emptyState) emptyState.style.display = !hasAnyItems() ? 'flex' : 'none';
-    if (document.querySelector('.input-section')) document.querySelector('.input-section').style.display = '';
 }
 
 function showPRDetailView() {
     currentView = 'pr-detail';
-    if (myPrsList) myPrsList.style.display = 'none';
-    if (prDetailList) prDetailList.style.display = 'block';
-    if (workflowRunsList) workflowRunsList.style.display = 'none';
+    switchPage('my-prs');
+    document.getElementById('prListView')?.classList.remove('active');
+    document.getElementById('workflowRunsView')?.classList.remove('active');
+    document.getElementById('prDetailView')?.classList.add('active');
     if (myPrsNav) myPrsNav.style.display = 'none';
     if (prDetailNav) prDetailNav.style.display = 'flex';
     if (workflowRunsNav) workflowRunsNav.style.display = 'none';
-    if (runsList) runsList.style.display = 'none';
-    if (emptyState) emptyState.style.display = 'none';
-    document.querySelector('.input-section')?.style && (document.querySelector('.input-section').style.display = 'none');
 }
 
 function showWorkflowRunsView() {
     currentView = 'workflow-runs';
-    if (myPrsList) myPrsList.style.display = 'none';
-    if (prDetailList) prDetailList.style.display = 'none';
-    if (workflowRunsList) workflowRunsList.style.display = 'block';
+    switchPage('my-prs');
+    document.getElementById('prListView')?.classList.remove('active');
+    document.getElementById('prDetailView')?.classList.remove('active');
+    document.getElementById('workflowRunsView')?.classList.add('active');
     if (myPrsNav) myPrsNav.style.display = 'none';
     if (prDetailNav) prDetailNav.style.display = 'none';
     if (workflowRunsNav) workflowRunsNav.style.display = 'flex';
-    if (runsList) runsList.style.display = 'none';
-    if (emptyState) emptyState.style.display = 'none';
-    document.querySelector('.input-section')?.style && (document.querySelector('.input-section').style.display = 'none');
 }
 
 let currentView = 'main';
@@ -521,8 +565,25 @@ function createRunItem(run, owner, repo, { isLatestFailed = false } = {}) {
                 btn.disabled = false;
                 btn.textContent = '↩ Rerun Failed Only';
             } else {
-                markFailedOnlyAttempt(run.runId, currentWorkflowRuns.length + 1);
+                const nextAttempt = currentWorkflowRuns.length + 1;
+                markFailedOnlyAttempt(run.runId, nextAttempt);
                 btn.remove();
+
+                // Add placeholder so the user sees the new attempt immediately
+                const placeholder = document.createElement('div');
+                placeholder.className = 'pr-detail-run placeholder';
+                placeholder.dataset.placeholder = 'true';
+                placeholder.innerHTML = `
+                    <span class="status-dot idle"></span>
+                    <span class="pr-detail-run-name">#${nextAttempt} <span class="failed-only-badge">failed jobs only</span></span>
+                    <span class="pr-detail-run-status">Queued</span>
+                    <div class="pr-detail-run-actions"></div>
+                `;
+                workflowRunsList.prepend(placeholder);
+
+                // Register pending rerun so onWorkflowRunAppeared refreshes this view
+                inMemoryPendingRerun = { owner, repo, runId: run.runId, fromAttempt: currentWorkflowRuns.length, total: 1 };
+                window.api.savePendingRerun(inMemoryPendingRerun);
             }
         });
     }
@@ -708,14 +769,7 @@ prDetailBack?.addEventListener('click', () => {
 });
 
 workflowRunsBack?.addEventListener('click', () => {
-    const currentPage = document.querySelector('.nav-item.active')?.dataset.page;
-    if (currentPage === 'my-prs') {
-        showWorkflowRunsDetail();
-        if (currentPR) {
-            if (prDetailTitle) prDetailTitle.textContent = `${currentPR.title} #${currentPR.number}`;
-            updateBreadcrumb('My PRs', `${currentPR.title} #${currentPR.number}`);
-        }
-    } else if (workflowRunsBackTarget === 'main') {
+    if (workflowRunsBackTarget === 'main') {
         updateBreadcrumb('Dashboard', null);
         showMainView();
     } else if (currentPR) {

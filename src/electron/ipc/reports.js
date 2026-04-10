@@ -42,6 +42,16 @@ function register({ db, getWindow }) {
         lines.push('', '---', '*Made by [SubCat](https://subcat.todaywedream.com)*');
         fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
 
+        db.addSavedReport({
+            title: report.name,
+            type: 'run',
+            filePath,
+            total,
+            passed,
+            failed,
+            flakiness: flakinessSummary,
+        });
+
         return { saved: true };
     });
 
@@ -84,7 +94,27 @@ function register({ db, getWindow }) {
             '*Made by [SubCat](https://subcat.todaywedream.com)*',
         ];
         fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+
+        db.addSavedReport({
+            title: workflowName,
+            type: 'pr-workflow',
+            filePath,
+            total: runs.length,
+            passed,
+            failed,
+            flakiness: failed === 0 ? 'Stable' : failed < runs.length / 2 ? 'Probably flaky' : 'Flaky',
+        });
+
         return { saved: true };
+    });
+
+    ipcMain.handle('get-saved-reports', () => {
+        return db.getAllSavedReports();
+    });
+
+    ipcMain.handle('delete-saved-report', (event, id) => {
+        db.deleteSavedReport(id);
+        return { deleted: true };
     });
 }
 

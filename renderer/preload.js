@@ -40,5 +40,8 @@ contextBridge.exposeInMainWorld('api', {
     savePendingRerun: (opts) => ipcRenderer.invoke('save-pending-rerun', opts),
     getPendingRerun: (opts) => ipcRenderer.invoke('get-pending-rerun', opts),
     deletePendingRerun: (opts) => ipcRenderer.invoke('delete-pending-rerun', opts),
-    getPRStats: () => ipcRenderer.invoke('get-pr-stats')
+    getPRStats: () => ipcRenderer.invoke('get-pr-stats'),
+    getSavedReports: () => ipcRenderer.invoke('get-saved-reports'),
+    deleteSavedReport: (id) => ipcRenderer.invoke('delete-saved-report', id),
+    revealInFinder: (filePath) => ipcRenderer.invoke('reveal-in-finder', filePath)
 });

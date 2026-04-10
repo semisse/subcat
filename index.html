@@ -595,6 +595,53 @@
             color: var(--text-secondary);
         }
 
+        .run-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .run-actions button {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .run-actions button:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .run-actions button.open-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .run-actions button.cancel-run-btn:hover,
+        .run-actions button.remove-btn:hover {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+            background: rgba(244, 63, 94, 0.1);
+        }
+
+        .run-actions button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
         .run-card-actions {
             display: flex;
             gap: 8px;
@@ -1088,7 +1135,8 @@
             overflow: hidden;
         }
 
-        .detail-list-item {
+        .detail-list-item,
+        .pr-detail-run {
             display: flex;
             align-items: center;
             gap: 14px;
@@ -1098,15 +1146,18 @@
             transition: background 0.15s;
         }
 
-        .detail-list-item:last-child {
+        .detail-list-item:last-child,
+        .pr-detail-run:last-child {
             border-bottom: none;
         }
 
-        .detail-list-item:hover {
+        .detail-list-item:hover,
+        .pr-detail-run:hover {
             background: var(--bg-card-hover);
         }
 
-        .detail-item-name {
+        .detail-item-name,
+        .pr-detail-run-name {
             flex: 1;
             font-size: 14px;
             color: var(--text-primary);
@@ -1115,7 +1166,8 @@
             text-overflow: ellipsis;
         }
 
-        .detail-item-status {
+        .detail-item-status,
+        .pr-detail-run-status {
             font-size: 13px;
             color: var(--text-muted);
         }
@@ -1125,12 +1177,14 @@
             font-size: 18px;
         }
 
-        .detail-item-actions {
+        .detail-item-actions,
+        .pr-detail-run-actions {
             display: flex;
             gap: 8px;
         }
 
-        .detail-item-actions button {
+        .detail-item-actions button,
+        .pr-detail-run-actions button {
             padding: 8px 12px;
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
@@ -1146,14 +1200,16 @@
             gap: 4px;
         }
 
-        .detail-item-actions button:hover {
+        .detail-item-actions button:hover,
+        .pr-detail-run-actions button:hover {
             background: var(--bg-card-hover);
             border-color: var(--border-color-hover);
             color: var(--text-primary);
             transform: translateY(-1px);
         }
 
-        .detail-item-actions button:disabled {
+        .detail-item-actions button:disabled,
+        .pr-detail-run-actions button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             transform: none;
@@ -1161,7 +1217,8 @@
 
         .detail-item-actions button.primary,
         .detail-item-actions button.rerun-btn,
-        .detail-item-actions button.wf-rerun-failed-btn {
+        .detail-item-actions button.wf-rerun-failed-btn,
+        .pr-detail-run-actions button.wf-rerun-failed-btn {
             background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
             border: none;
             color: white;
@@ -1170,12 +1227,14 @@
 
         .detail-item-actions button.primary:hover,
         .detail-item-actions button.rerun-btn:hover,
-        .detail-item-actions button.wf-rerun-failed-btn:hover {
+        .detail-item-actions button.wf-rerun-failed-btn:hover,
+        .pr-detail-run-actions button.wf-rerun-failed-btn:hover {
             box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
             transform: translateY(-1px);
         }
 
-        .detail-item-actions button.open-btn:hover {
+        .detail-item-actions button.open-btn:hover,
+        .pr-detail-run-actions button.open-run-btn:hover {
             border-color: var(--accent-blue);
             color: var(--accent-blue);
             background: rgba(59, 130, 246, 0.1);
@@ -1183,7 +1242,8 @@
 
         .detail-item-actions button.cancel-btn:hover,
         .detail-item-actions button.stop-btn:hover,
-        .detail-item-actions button.wf-cancel-run-btn:hover {
+        .detail-item-actions button.wf-cancel-run-btn:hover,
+        .pr-detail-run-actions button.wf-cancel-run-btn:hover {
             border-color: var(--accent-red);
             color: var(--accent-red);
             background: rgba(244, 63, 94, 0.1);
@@ -1283,6 +1343,113 @@
         .report-card-btn:hover {
             background: var(--bg-card-hover);
             border-color: var(--border-color-hover);
+        }
+
+        /* Saved Reports List */
+        .saved-reports-section {
+            margin-top: 32px;
+        }
+
+        .saved-reports-header {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .saved-reports-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .saved-report-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 14px 18px;
+            transition: border-color 0.15s;
+        }
+
+        .saved-report-item:hover {
+            border-color: var(--border-color-hover);
+        }
+
+        .saved-report-title {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .saved-report-badge {
+            font-size: 12px;
+            font-weight: 500;
+            padding: 3px 10px;
+            border-radius: 999px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .saved-report-badge.stable {
+            background: rgba(34,197,94,0.15);
+            color: #22c55e;
+        }
+
+        .saved-report-badge.flaky {
+            background: rgba(239,68,68,0.15);
+            color: #ef4444;
+        }
+
+        .saved-report-badge.probably-flaky {
+            background: rgba(234,179,8,0.15);
+            color: #eab308;
+        }
+
+        .saved-report-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .saved-report-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .saved-report-actions button {
+            background: none;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 10px;
+            transition: all 0.15s;
+        }
+
+        .saved-report-actions button:hover {
+            border-color: var(--border-color-hover);
+            color: var(--text-primary);
+        }
+
+        .saved-report-actions .delete-btn:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .saved-reports-empty {
+            font-size: 13px;
+            color: var(--text-muted);
+            padding: 20px 0;
         }
 
         /* Profile Page */
@@ -1820,55 +1987,10 @@
 
             <!-- Reports Page -->
             <section class="page-section" id="pageReports">
-                <div class="reports-grid">
-                    <div class="report-card">
-                        <div class="report-card-header">
-                            <div class="report-card-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <div class="report-card-title">Flaky Tests Report</div>
-                                <div class="report-card-subtitle">Tests that fail intermittently</div>
-                            </div>
-                        </div>
-                        <div class="report-card-stats">
-                            <div class="report-stat">
-                                <div class="report-stat-value">0</div>
-                                <div class="report-stat-label">Flaky Tests</div>
-                            </div>
-                            <div class="report-stat">
-                                <div class="report-stat-value">0%</div>
-                                <div class="report-stat-label">Flakiness Rate</div>
-                            </div>
-                        </div>
-                        <button class="report-card-btn">View Details</button>
-                    </div>
-
-                    <div class="report-card">
-                        <div class="report-card-header">
-                            <div class="report-card-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-                                </svg>
-                            </div>
-                            <div>
-                                <div class="report-card-title">Failure Trends</div>
-                                <div class="report-card-subtitle">Historical failure analysis</div>
-                            </div>
-                        </div>
-                        <div class="report-card-stats">
-                            <div class="report-stat">
-                                <div class="report-stat-value">0</div>
-                                <div class="report-stat-label">Total Failures</div>
-                            </div>
-                            <div class="report-stat">
-                                <div class="report-stat-value">0</div>
-                                <div class="report-stat-label">This Week</div>
-                            </div>
-                        </div>
-                        <button class="report-card-btn">View Details</button>
+                <div class="saved-reports-section">
+                    <div class="saved-reports-header">Saved Reports</div>
+                    <div class="saved-reports-list" id="savedReportsList">
+                        <div class="saved-reports-empty">No reports saved yet. Save a report from a run to see it here.</div>
                     </div>
                 </div>
             </section>
