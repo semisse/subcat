@@ -6,3 +6,5 @@ coverage/
 CLAUDE.md
 *.p12
 *.cer
+prompts/
+assets/welcome.md

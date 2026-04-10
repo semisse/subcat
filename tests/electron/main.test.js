@@ -33,6 +33,7 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
         getVersion: jest.fn(() => '1.0.0'),
         quit: jest.fn(),
         showAboutPanel: jest.fn(),
+        commandLine: { appendSwitch: jest.fn() },
     };
 
     const ipcHandlers = {};

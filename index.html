@@ -483,6 +483,21 @@
 
         .notif-link:hover { text-decoration: underline; }
 
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
         /* Content Area */
         .content-area {
             flex: 1;
@@ -493,16 +508,22 @@
         /* Welcome Card */
         .welcome-card {
             display: flex;
-            align-items: center;
+            flex-direction: column;
             justify-content: space-between;
+            align-items: flex-start;
             background: linear-gradient(127.09deg, rgba(67, 24, 255, 0.94) 19.41%, rgba(111, 80, 255, 0.49) 76.65%);
+            background-image: url('assets/subcat-welcome.png');
+            background-position: center 72px;
+            background-size: cover;
+            background-repeat: no-repeat;
             border: 1px solid rgba(134, 140, 255, 0.25);
             border-radius: var(--radius-xl);
-            padding: 28px 32px;
-            margin-bottom: 28px;
+            padding: 28px 32px 0;
             overflow: hidden;
             position: relative;
             box-shadow: 0 8px 40px rgba(67, 24, 255, 0.35);
+            grid-column: span 2;
+            grid-row: span 2;
         }
 
         .welcome-card::before {
@@ -536,12 +557,11 @@
         }
 
         .welcome-card-image {
-            height: 130px;
+            max-height: 300px;
             width: auto;
             object-fit: contain;
-            margin-bottom: -28px;
-            filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.4));
-            flex-shrink: 0;
+            align-self: center;
+            margin-top: auto;
         }
 
         /* Stats Grid */
@@ -2569,14 +2589,14 @@
         <div class="content-area">
             <!-- Home Page -->
             <section class="page-section active" id="pageHome">
+                <div class="stats-grid">
                 <div class="welcome-card">
                     <div class="welcome-card-text">
                         <div class="welcome-card-greeting">Welcome back, <span id="welcomeUsername">there</span>!</div>
                         <div class="welcome-card-sub">Glad to see you again.</div>
                     </div>
-                    <img src="assets/subcat-welcome.png" class="welcome-card-image" alt="SubCat">
+                    <!-- <img src="assets/subcat-welcome.png" class="welcome-card-image" alt="SubCat"> -->
                 </div>
-                <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-card-header">
                             <div class="stat-card-icon purple">

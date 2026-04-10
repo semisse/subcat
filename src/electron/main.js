@@ -1,4 +1,6 @@
 const { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, dialog } = require('electron');
+
+app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -64,14 +66,13 @@ function createLoginWindow() {
 }
 
 function createMainWindow() {
-    mainWindow = new BrowserWindow({ 
-        width: 1200, 
-        height: 800, 
-        minWidth: 800, 
-        minHeight: 600, 
-        resizable: true, 
-        titleBarStyle: 'hidden',
-        ...windowPrefs 
+    mainWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        minWidth: 800,
+        minHeight: 600,
+        resizable: true,
+        ...windowPrefs  // titleBarStyle: 'hiddenInset' applied on macOS via windowPrefs
     });
     mainWindow.loadFile(path.join(__dirname, '../../index.html'));
     mainWindow.on('closed', () => { mainWindow = null; });

@@ -1,6 +1,7 @@
 jest.mock('../../src/core/github');
 const github = require('../../src/core/github');
 const {
+    startWatching,
     rerunRun, rerunFailedRun, stopWatching, cancelRunHandler, resumeRuns,
     watchWorkflowRerun, fetchRunAttemptsHandler,
     pinWorkflow, unpinWorkflow, resumePinnedWorkflows,
@@ -51,6 +52,94 @@ const RUN = {
     url: 'https://github.com/owner/repo/actions/runs/42',
     repeat_total: 3,
 };
+
+const VALID_URL = 'https://github.com/owner/repo/actions/runs/42';
+
+// ─── startWatching ────────────────────────────────────────────────────────────
+
+describe('startWatching', () => {
+    beforeEach(() => jest.clearAllMocks());
+    test('returns error for invalid URL', async () => {
+        github.parseGitHubUrl.mockReturnValue(null);
+        const result = await startWatching({ url: 'https://github.com/owner/repo' }, { db: makeDb(), poller: makePoller(), getToken: () => 'tok' });
+        expect(result.error).toMatch(/Invalid GitHub Actions URL/);
+    });
+
+    test('returns error when repeat count is out of range', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        const result = await startWatching({ url: VALID_URL, repeatTotal: 200 }, { db: makeDb(), poller: makePoller(), getToken: () => 'tok' });
+        expect(result.error).toMatch(/Repeat count/);
+    });
+
+    test('returns error when run is already being watched', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        const poller = makePoller({ isActive: jest.fn(() => true) });
+        const result = await startWatching({ url: VALID_URL }, { db: makeDb(), poller, getToken: () => 'tok' });
+        expect(result).toEqual({ error: 'Already watching this run.' });
+    });
+
+    test('returns error when run is already in db (completed, repeat=1)', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        github.fetchRunStatus.mockResolvedValue({ status: 'completed', conclusion: 'success', workflow_id: 'wf1', html_url: 'u', display_title: 'CI' });
+        const db = makeDb({ getRun: jest.fn(() => ({ id: '42' })) }); // already in db
+        const result = await startWatching({ url: VALID_URL, repeatTotal: 1 }, { db, poller: makePoller(), getToken: () => 'tok' });
+        expect(result).toEqual({ error: 'This run is already in the list.' });
+    });
+
+    test('adds completed run to db immediately when repeat=1', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        github.fetchRunStatus.mockResolvedValue({ status: 'completed', conclusion: 'success', workflow_id: 'wf1', html_url: 'u', display_title: 'CI', run_started_at: null, updated_at: null });
+        const db = makeDb({ getRun: jest.fn(() => null) });
+        const result = await startWatching({ url: VALID_URL, repeatTotal: 1 }, { db, poller: makePoller(), getToken: () => 'tok' });
+        expect(db.addRun).toHaveBeenCalled();
+        expect(db.addRunResult).toHaveBeenCalled();
+        expect(result).toMatchObject({ started: true, status: 'completed', conclusion: 'success' });
+    });
+
+    test('fetches failed tests when conclusion is not success (repeat=1)', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        github.fetchRunStatus.mockResolvedValue({ status: 'completed', conclusion: 'failure', workflow_id: 'wf1', html_url: 'u', display_title: 'CI', run_started_at: null, updated_at: null });
+        github.fetchFailedTests.mockResolvedValue(['test_a']);
+        const db = makeDb({ getRun: jest.fn(() => null) });
+        const result = await startWatching({ url: VALID_URL, repeatTotal: 1 }, { db, poller: makePoller(), getToken: () => 'tok' });
+        expect(github.fetchFailedTests).toHaveBeenCalledWith('owner', 'repo', '42', 'tok');
+        expect(result.failedTests).toEqual(['test_a']);
+    });
+
+    test('does not fetch failed tests when conclusion is success (repeat=1)', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        github.fetchRunStatus.mockResolvedValue({ status: 'completed', conclusion: 'success', workflow_id: 'wf1', html_url: 'u', display_title: 'CI', run_started_at: null, updated_at: null });
+        const db = makeDb({ getRun: jest.fn(() => null) });
+        await startWatching({ url: VALID_URL, repeatTotal: 1 }, { db, poller: makePoller(), getToken: () => 'tok' });
+        expect(github.fetchFailedTests).not.toHaveBeenCalled();
+    });
+
+    test('starts poller for in-progress run', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        github.fetchRunStatus.mockResolvedValue({ status: 'in_progress', conclusion: null, workflow_id: 'wf1', html_url: 'u', display_title: 'CI' });
+        const poller = makePoller();
+        await startWatching({ url: VALID_URL, repeatTotal: 1 }, { db: makeDb(), poller, getToken: () => 'tok' });
+        expect(poller.start).toHaveBeenCalled();
+    });
+
+    test('triggers rerun and starts poller for completed run with repeat>1', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        github.fetchRunStatus.mockResolvedValue({ status: 'completed', conclusion: 'success', workflow_id: 'wf1', html_url: 'u', display_title: 'CI' });
+        github.rerunWorkflow.mockResolvedValue(undefined);
+        const poller = makePoller();
+        const result = await startWatching({ url: VALID_URL, repeatTotal: 3 }, { db: makeDb(), poller, getToken: () => 'tok' });
+        expect(github.rerunWorkflow).toHaveBeenCalledWith('owner', 'repo', '42', 'tok');
+        expect(poller.start).toHaveBeenCalled();
+        expect(result).toMatchObject({ started: true, repeatTotal: 3 });
+    });
+
+    test('returns error when fetchRunStatus throws', async () => {
+        github.parseGitHubUrl.mockReturnValue({ owner: 'owner', repo: 'repo', runId: '42' });
+        github.fetchRunStatus.mockRejectedValue(new Error('API unavailable'));
+        const result = await startWatching({ url: VALID_URL }, { db: makeDb(), poller: makePoller(), getToken: () => 'tok' });
+        expect(result).toEqual({ error: 'API unavailable' });
+    });
+});
 
 // ─── rerunRun ─────────────────────────────────────────────────────────────────
 

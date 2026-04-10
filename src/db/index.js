@@ -63,9 +63,9 @@ function migrate(db) {
         db.exec(`ALTER TABLE runs ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'`);
     } catch (_) { /* column already exists */ }
 
-    try { db.exec(`ALTER TABLE runs ADD COLUMN pr_number INTEGER`); } catch (_) {}
-    try { db.exec(`ALTER TABLE runs ADD COLUMN pr_title TEXT`); } catch (_) {}
-    try { db.exec(`ALTER TABLE runs ADD COLUMN head_sha TEXT`); } catch (_) {}
+    try { db.exec(`ALTER TABLE runs ADD COLUMN pr_number INTEGER`); } catch (_) { /* column already exists */ }
+    try { db.exec(`ALTER TABLE runs ADD COLUMN pr_title TEXT`); } catch (_) { /* column already exists */ }
+    try { db.exec(`ALTER TABLE runs ADD COLUMN head_sha TEXT`); } catch (_) { /* column already exists */ }
 
     db.exec(`
         CREATE TABLE IF NOT EXISTS failed_only_attempts (

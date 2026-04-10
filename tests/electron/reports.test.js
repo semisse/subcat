@@ -11,7 +11,12 @@ function setup({ report = null, filePath = null } = {}) {
 
     const ipcHandlers = {};
     const dialog = { showSaveDialog: jest.fn().mockResolvedValue({ filePath }) };
-    const db = { getReport: jest.fn(() => report) };
+    const db = {
+        getReport: jest.fn(() => report),
+        addSavedReport: jest.fn(),
+        getAllSavedReports: jest.fn(() => []),
+        deleteSavedReport: jest.fn(),
+    };
 
     jest.doMock('electron', () => ({
         ipcMain: { handle: jest.fn((ch, fn) => { ipcHandlers[ch] = fn; }) },

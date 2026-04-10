@@ -664,13 +664,13 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     const navPage = isRunsSource ? 'runs' : 'my-prs';
     const prLabel = !isRunsSource && currentPR ? `${currentPR.title} #${currentPR.number}` : null;
 
+    showWorkflowRunsView(navPage);
+
     if (isRunsSource) {
         updateBreadcrumb('Runs', workflow.name);
     } else {
         updateBreadcrumb('My PRs', prLabel, workflow.name);
     }
-
-    showWorkflowRunsView(navPage);
     if (workflowRunsTitle) workflowRunsTitle.textContent = workflow.name;
     const wfPRContext = document.getElementById('workflowRunsPRContext');
     if (wfPRContext) wfPRContext.textContent = prLabel ?? '';
