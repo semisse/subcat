@@ -91,6 +91,7 @@
             text-decoration: none;
             position: relative;
             overflow: hidden;
+            border: 1px solid transparent;
         }
 
         .nav-item:hover {
@@ -2731,6 +2732,10 @@
             <section class="page-section" id="pageMyprs">
                 <div class="detail-view active" id="prListView">
                     <div class="my-prs-list" id="myPrsList"></div>
+                    <div class="empty-state hidden" id="myPrsEmptyState">
+                        <img src="assets/noresults.png" alt="">
+                        <p>No open pull requests found for your account.</p>
+                    </div>
                 </div>
 
                 <div class="detail-view" id="prDetailView">

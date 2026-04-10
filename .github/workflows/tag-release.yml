@@ -8,6 +8,10 @@ name: Tag Release
 #   1. Bump "version" in package.json on dev
 #   2. Open PR dev → main
 #   3. Merge — this workflow tags automatically and release starts
+#
+# Note: the tag must be pushed with a PAT (GH_PAT secret) so that GitHub
+# treats it as a user action and triggers release.yml. Tags pushed with
+# GITHUB_TOKEN are silently ignored by subsequent workflow triggers.
 
 on:
   push:
@@ -16,11 +20,11 @@ on:
 jobs:
   tag:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
 
       - name: Read version from package.json
         id: version

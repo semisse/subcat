@@ -355,12 +355,15 @@ async function loadPRStats() {
 }
 
 async function loadUserPRs() {
+    const myPrsEmptyState = document.getElementById('myPrsEmptyState');
     const result = await window.api.fetchUserPRs();
     if (result.error || !result.prs?.length) {
+        if (myPrsEmptyState) myPrsEmptyState.classList.remove('hidden');
         updateDashboardStats();
         return;
     }
 
+    if (myPrsEmptyState) myPrsEmptyState.classList.add('hidden');
     if (myPrsList) myPrsList.innerHTML = '';
 
     if (result.prs.length > 4 && myPrsList) myPrsList.classList.add('scrollable');
@@ -1283,6 +1286,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
             cardClone.remove();
             watchedRuns.delete(runId);
             if (!hasAnyItems()) emptyState.style.display = 'flex';
+            if (!runsListPage.querySelector('.run-card')) runsListPage.querySelector('.empty-state').style.display = 'flex';
             updateSectionVisibility();
         });
         cardClone.querySelector('.remove-btn')?.addEventListener('click', async () => {
@@ -1297,6 +1301,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
             cardClone.remove();
             watchedRuns.delete(runId);
             if (!hasAnyItems()) emptyState.style.display = 'flex';
+            if (!runsListPage.querySelector('.run-card')) runsListPage.querySelector('.empty-state').style.display = 'flex';
             updateSectionVisibility();
         });
         const emptyStatePage = runsListPage.querySelector('.empty-state');
