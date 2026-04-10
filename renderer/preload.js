@@ -56,4 +56,7 @@ contextBridge.exposeInMainWorld('api', {
     markNotificationsRead: () => ipcRenderer.invoke('mark-notifications-read'),
     clearNotifications: () => ipcRenderer.invoke('clear-notifications'),
     onNotificationAdded: (cb) => ipcRenderer.on('notification-added', (_, data) => cb(data)),
+    onUpdateDownloadProgress: (cb) => ipcRenderer.on('update-download-progress', (_, data) => cb(data)),
+    onUpdateReady: (cb) => ipcRenderer.on('update-ready', (_, data) => cb(data)),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
 });

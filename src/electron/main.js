@@ -164,7 +164,7 @@ function buildMenu() {
             label: 'View',
             submenu: [
                 { role: 'reload' },
-                { role: 'toggleDevTools' },
+                ...(process.env.NODE_ENV === 'development' ? [{ role: 'toggleDevTools' }] : []),
                 { type: 'separator' },
                 { role: 'resetZoom' },
                 { role: 'zoomIn' },
@@ -195,21 +195,39 @@ app.on('window-all-closed', () => {
 if (process.env.NODE_ENV !== 'development') {
     autoUpdater.checkForUpdates();
 
-    autoUpdater.on('update-downloaded', () => {
-        const dialogParent = mainWindow ?? undefined;
-        dialog.showMessageBox(dialogParent, {
-            type: 'info',
-            buttons: ['Restart', 'Later'],
-            defaultId: 0,
-            cancelId: 1,
-            title: 'Update ready',
-            message: 'A new version of SubCat has been downloaded.',
-            detail: 'Restart the app to apply the update.',
-        }).then(({ response }) => {
-            if (response === 0) autoUpdater.quitAndInstall();
+    autoUpdater.on('update-available', (info) => {
+        const record = db.addNotification({
+            title: `Update available: v${info.version}`,
+            body: 'Downloading in the background…',
+            url: null,
+            conclusion: 'update',
+            runName: '',
+        });
+        const unread = db.getUnreadNotificationCount();
+        getWindow()?.webContents.send('notification-added', {
+            id: record.lastInsertRowid,
+            title: `Update available: v${info.version}`,
+            body: 'Downloading in the background…',
+            url: null,
+            conclusion: 'update',
+            triggered_at: new Date().toISOString(),
+            read: 0,
+            unreadCount: unread,
         });
     });
+
+    autoUpdater.on('download-progress', (progress) => {
+        getWindow()?.webContents.send('update-download-progress', {
+            percent: Math.round(progress.percent),
+        });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        getWindow()?.webContents.send('update-ready', { version: info.version });
+    });
 }
+
+ipcMain.handle('install-update', () => autoUpdater.quitAndInstall());
 
 app.on('activate', () => {
     if (mainWindow) {

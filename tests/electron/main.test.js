@@ -116,34 +116,8 @@ function buildMocks({ token = null, fetchUserResult = null } = {}) {
 describe('autoUpdater update-downloaded', () => {
     beforeEach(() => jest.resetModules());
 
-    test('calls showMessageBox with undefined parent when mainWindow has not been created', async () => {
-        const { autoUpdater, dialog } = buildMocks();
-        require('../../src/electron/main');
-        await Promise.resolve();
-
-        dialog.showMessageBox.mockResolvedValue({ response: 1 });
-        autoUpdater.emit('update-downloaded');
-
-        expect(dialog.showMessageBox).toHaveBeenCalledWith(
-            undefined,
-            expect.objectContaining({ title: 'Update ready' })
-        );
-    });
-
-    test('never passes null as the dialog parent (the bug that was fixed)', async () => {
-        const { autoUpdater, dialog } = buildMocks();
-        require('../../src/electron/main');
-        await Promise.resolve();
-
-        dialog.showMessageBox.mockResolvedValue({ response: 1 });
-        autoUpdater.emit('update-downloaded');
-
-        const [parent] = dialog.showMessageBox.mock.calls[0];
-        expect(parent).not.toBeNull();
-    });
-
-    test('calls showMessageBox with the BrowserWindow when mainWindow exists', async () => {
-        const { autoUpdater, dialog, BrowserWindow } = buildMocks({
+    test('sends update-ready IPC to renderer when mainWindow exists', async () => {
+        const { autoUpdater, BrowserWindow } = buildMocks({
             token: 'mock-token',
             fetchUserResult: { login: 'semisse', avatar_url: 'https://example.com/avatar.png' },
         });
@@ -152,52 +126,30 @@ describe('autoUpdater update-downloaded', () => {
         await Promise.resolve(); // tick 2: fetchUser await
         await Promise.resolve(); // tick 3: createMainWindow + rest of handler
 
-        dialog.showMessageBox.mockResolvedValue({ response: 1 });
-        autoUpdater.emit('update-downloaded');
+        autoUpdater.emit('update-downloaded', { version: '1.2.0' });
 
-        const [parent] = dialog.showMessageBox.mock.calls[0];
-        expect(parent).toBe(BrowserWindow._mockInstance);
+        expect(BrowserWindow._mockInstance.webContents.send).toHaveBeenCalledWith(
+            'update-ready',
+            { version: '1.2.0' }
+        );
     });
 
-    test('calls quitAndInstall when user selects Restart (response 0)', async () => {
-        const { autoUpdater, dialog } = buildMocks();
+    test('does not throw when mainWindow has not been created', async () => {
+        const { autoUpdater } = buildMocks();
         require('../../src/electron/main');
         await Promise.resolve();
 
-        dialog.showMessageBox.mockResolvedValue({ response: 0 });
-        autoUpdater.emit('update-downloaded');
+        expect(() => autoUpdater.emit('update-downloaded', { version: '1.2.0' })).not.toThrow();
+    });
+
+    test('install-update IPC calls quitAndInstall', async () => {
+        const { autoUpdater, ipcHandlers } = buildMocks();
+        require('../../src/electron/main');
         await Promise.resolve();
+
+        ipcHandlers['install-update']();
 
         expect(autoUpdater.quitAndInstall).toHaveBeenCalled();
-    });
-
-    test('does not call quitAndInstall when user selects Later (response 1)', async () => {
-        const { autoUpdater, dialog } = buildMocks();
-        require('../../src/electron/main');
-        await Promise.resolve();
-
-        dialog.showMessageBox.mockResolvedValue({ response: 1 });
-        autoUpdater.emit('update-downloaded');
-        await Promise.resolve();
-
-        expect(autoUpdater.quitAndInstall).not.toHaveBeenCalled();
-    });
-
-    test('shows the update dialog with the correct options', async () => {
-        const { autoUpdater, dialog } = buildMocks();
-        require('../../src/electron/main');
-        await Promise.resolve();
-
-        dialog.showMessageBox.mockResolvedValue({ response: 1 });
-        autoUpdater.emit('update-downloaded');
-
-        const [, opts] = dialog.showMessageBox.mock.calls[0];
-        expect(opts).toMatchObject({
-            type: 'info',
-            buttons: ['Restart', 'Later'],
-            defaultId: 0,
-            cancelId: 1,
-        });
     });
 });
 
