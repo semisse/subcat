@@ -9,36 +9,51 @@
   <a href="https://ko-fi.com/semisse"><img src="https://img.shields.io/badge/Ko--fi-donate-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
 
-A macOS app that monitors GitHub Actions runs and sends native notifications when they finish.
+A desktop app for developers who live in GitHub Actions. SubCat watches your CI runs, notifies you when they finish, and helps you hunt down flaky tests — both in the cloud and locally.
+
+Built with Electron. Runs on macOS and Linux.
 
 ## Install
 
-Download the latest `.dmg` from [Releases](../../releases), open it, and drag SubCat to your Applications folder.
+Download the latest build from [Releases](../../releases):
 
-## How it works
+- **macOS** — open the `.dmg` and drag SubCat to Applications
+- **Linux** — `.AppImage` (portable) or `.deb` (Debian/Ubuntu)
 
-1. Log in with your GitHub account (OAuth Device Flow — no password stored)
-2. Paste a GitHub Actions run URL
-3. SubCat polls every 15 seconds and notifies you when the run completes
-4. Click the notification to open the run in your browser
+## What it does
 
-## Features
+### Watch CI runs
+Log in with GitHub (OAuth Device Flow — no password stored), paste a run URL, and SubCat polls every 15 seconds. Native desktop notification when it completes; click to open in the browser. Multiple runs in parallel, and they survive app restarts.
 
-- Watch multiple runs simultaneously
-- Repeat a run N times to catch flaky tests — get a pass/failure summary at the end
-- Export results to Markdown
-- Runs persist across restarts — pick up where you left off
-- Token encrypted via macOS Keychain (`safeStorage`)
+### My PRs
+Browse your open pull requests, drill into their workflow runs, and see per-PR CI stats (total runs, CI time, failure rate, pain index).
+
+### Workflows
+Navigate workflows by repository, inspect recent runs, and re-run failed jobs without leaving the app.
+
+### Flake hunting (Lab Runs)
+Repeat any GitHub Actions run N times to catch flaky tests. SubCat aggregates pass/failure counts across iterations and exports a Markdown report. Past runs are saved and browsable from the Reports page with a drill-down viewer.
+
+### Lab Test (local runner)
+Run test commands on your own machine in a loop and capture flaky results with live streaming output. Supports Playwright, Jest, Vitest, and Nx projects. History of past local runs is preserved and deletable.
+
+### Security
+- GitHub token encrypted via the OS keychain (`safeStorage` on macOS, `libsecret` on Linux)
+- `contextIsolation` on, `nodeIntegration` off, explicit `window.api` bridge
+- External links restricted to `https://github.com/`
 
 ## Feature flags
 
-Some features are hidden behind flags stored in `~/Library/Application Support/SubCat/feature-flags.json`. The file is created automatically on first run.
+Some features are gated by flags stored in the app's `userData` directory:
+
+- **macOS**: `~/Library/Application Support/SubCat/feature-flags.json`
+- **Linux**: `~/.config/SubCat/feature-flags.json`
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `lab-runs` | `false` | Lab Runs section — run stability checks and flakiness analysis |
+| `lab-runs` | `false` | Lab Runs + Lab Test — flake hunting in CI and locally |
 
-To enable a flag, edit the file directly:
+Edit the file and restart:
 
 ```json
 {
@@ -46,15 +61,30 @@ To enable a flag, edit the file directly:
 }
 ```
 
-Then restart the app.
-
 ## Dev setup
 
 ```bash
 npm install
-npm start        # production
-npm run dev      # with hot reload
-npm test         # unit tests
+npm start          # production
+npm run dev        # hot reload
+npm test           # unit tests (Jest)
+npm run test:e2e   # end-to-end tests (Playwright)
+npm run lint       # ESLint
 ```
 
-Requires Node 20+ and Xcode Command Line Tools (for native module compilation).
+Requires Node 20+ and platform build tools (Xcode CLT on macOS, `build-essential` on Linux) for native module compilation.
+
+## Architecture
+
+SubCat is split into three layers. `src/core/` has **zero platform dependencies** and is ready to be reused in a future mobile app:
+
+```
+src/
+  core/         pure business logic (auth, GitHub client, poller, runs, local-runner)
+  db/           SQLite via better-sqlite3
+  electron/     platform layer — main process, IPC handlers, storage, notifications
+renderer/       plain JS UI (no framework, no bundler)
+tests/          mirrors src/ structure
+```
+
+No TypeScript, no build step, no framework. See [`CLAUDE.md`](CLAUDE.md) for the full architectural rationale.
