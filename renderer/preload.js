@@ -66,6 +66,8 @@ contextBridge.exposeInMainWorld('api', {
     checkDocker: () => ipcRenderer.invoke('local-run:check-docker'),
     detectLabImage: (repoPath) => ipcRenderer.invoke('local-run:detect-image', { repoPath }),
     browseFolder: () => ipcRenderer.invoke('local-run:browse-folder'),
+    getLocalRuns: () => ipcRenderer.invoke('local-run:list'),
+    deleteLocalRun: (id) => ipcRenderer.invoke('local-run:delete', { id }),
     onLocalRunOutput: (cb) => ipcRenderer.on('local-run:output', (_, data) => cb(data)),
     onLocalRunProgress: (cb) => ipcRenderer.on('local-run:progress', (_, data) => cb(data)),
     onLocalRunDone: (cb) => ipcRenderer.on('local-run:done', (_, data) => cb(data)),

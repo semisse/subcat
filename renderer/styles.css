@@ -2763,3 +2763,92 @@
     letter-spacing: 0.04em;
     user-select: none;
 }
+
+/* ── Lab Test History ─────────────────────────────────────────────────────── */
+
+.lab-test-history {
+    margin-top: 32px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 20px;
+}
+
+.lab-history-header {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+.lab-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lab-history-row {
+    display: grid;
+    grid-template-columns: 130px 120px 1fr 36px auto 24px;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    font-size: 12px;
+}
+
+.lab-history-date {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.lab-history-project {
+    color: var(--text-primary);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lab-history-cmd {
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Menlo', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lab-history-repeat {
+    color: var(--text-secondary);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.lab-history-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.lab-history-badge.stable         { background: rgba(52,199,89,0.15);  color: var(--accent-green); }
+.lab-history-badge.probably-flaky { background: rgba(255,159,10,0.15); color: var(--accent-yellow); }
+.lab-history-badge.flaky          { background: rgba(255,69,58,0.15);  color: var(--accent-red); }
+.lab-history-badge.cancelled,
+.lab-history-badge.running        { background: rgba(120,120,128,0.15); color: var(--text-secondary); }
+.lab-history-badge.failed         { background: rgba(255,69,58,0.15);  color: var(--accent-red); }
+
+.lab-history-delete {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.4;
+    transition: opacity 0.15s;
+}
+.lab-history-delete:hover { opacity: 1; color: var(--accent-red); }

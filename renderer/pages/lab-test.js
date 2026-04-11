@@ -20,6 +20,7 @@ function initLabTest() {
         if (id !== activeRunId) return;
         activeRunId = null;
         renderDoneState(results);
+        renderHistory();
     });
 
     const repoInput = document.getElementById('labTestRepoPath');
@@ -47,6 +48,7 @@ function initLabTestPage() {
     checkDockerStatus();
     const repoPath = document.getElementById('labTestRepoPath')?.value.trim();
     if (repoPath) refreshImageDetection(repoPath);
+    renderHistory();
 }
 
 async function checkDockerStatus() {
@@ -183,6 +185,77 @@ function setPageState(state) {
     const page = document.getElementById('pageLabtest');
     if (!page) return;
     page.dataset.state = state;
+}
+
+async function renderHistory() {
+    const container = document.getElementById('labTestHistory');
+    if (!container) return;
+
+    const runs = await window.api.getLocalRuns();
+
+    if (!runs || runs.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let rows = '';
+    for (const run of runs) {
+        const date = run.started_at
+            ? new Date(run.started_at + 'Z').toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '—';
+
+        let badge = '';
+        if (run.status === 'cancelled') {
+            badge = '<span class="lab-history-badge cancelled">Cancelled</span>';
+        } else if (run.status === 'failed') {
+            badge = '<span class="lab-history-badge failed">Error</span>';
+        } else if (run.passed != null || run.failed != null) {
+            const perRun = (n) => run.repeat_count > 1 ? Math.round((n || 0) / run.repeat_count) : (n || 0);
+            const p = perRun(run.passed);
+            const f = perRun(run.failed);
+            const total = p + f;
+            let label, cls;
+            if (f === 0) { label = 'Stable'; cls = 'stable'; }
+            else if (f < total / 2) { label = 'Probably flaky'; cls = 'probably-flaky'; }
+            else { label = 'Flaky'; cls = 'flaky'; }
+            badge = `<span class="lab-history-badge ${cls}">${label}</span>`;
+        } else {
+            badge = '<span class="lab-history-badge running">Running</span>';
+        }
+
+        const project = run.repo_path
+            ? run.repo_path.replace(/\/+$/, '').split('/').pop()
+            : '—';
+
+        const cmd = run.test_command.length > 40
+            ? run.test_command.slice(0, 37) + '…'
+            : run.test_command;
+
+        rows += `
+            <div class="lab-history-row">
+                <span class="lab-history-date">${escapeHtml(date)}</span>
+                <span class="lab-history-project" title="${escapeHtml(run.repo_path)}">${escapeHtml(project)}</span>
+                <span class="lab-history-cmd" title="${escapeHtml(run.test_command)}">${escapeHtml(cmd)}</span>
+                <span class="lab-history-repeat">×${run.repeat_count}</span>
+                ${badge}
+                <button class="lab-history-delete" data-id="${run.id}" title="Delete">×</button>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="lab-history-header">Past runs</div>
+        <div class="lab-history-list">${rows}</div>
+    `;
+
+    container.querySelectorAll('.lab-history-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.dataset.id, 10);
+            await window.api.deleteLocalRun(id);
+            renderHistory();
+        });
+    });
 }
 
 function debounce(fn, ms) {

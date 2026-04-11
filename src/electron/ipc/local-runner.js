@@ -78,6 +78,18 @@ function register({ db, getWindow }) {
         }
         db.updateLocalRun(id, { status: 'cancelled', completedAt: new Date().toISOString() });
     });
+
+    handle('local-run:list', async () => {
+        return db.getLocalRuns();
+    });
+
+    handle('local-run:get', async (event, { id }) => {
+        return db.getLocalRun(id);
+    });
+
+    handle('local-run:delete', async (event, { id }) => {
+        db.deleteLocalRun(id);
+    });
 }
 
 module.exports = { register };
