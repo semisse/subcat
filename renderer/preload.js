@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('api', {
     getSavedReports: () => ipcRenderer.invoke('get-saved-reports'),
     deleteSavedReport: (id) => ipcRenderer.invoke('delete-saved-report', id),
     revealInFinder: (filePath) => ipcRenderer.invoke('reveal-in-finder', filePath),
+    readReportFile: (filePath) => ipcRenderer.invoke('read-report-file', filePath),
     getLabRuns: () => ipcRenderer.invoke('get-lab-runs'),
     getRunResult: (id) => ipcRenderer.invoke('get-run-result', id),
     getRunResultsForRun: (runId) => ipcRenderer.invoke('get-run-results-for-run', runId),

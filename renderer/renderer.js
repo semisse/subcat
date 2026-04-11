@@ -55,7 +55,7 @@ function switchPage(page) {
 
     updateBreadcrumb(pageTitles[page], null);
 
-    if (page === 'reports') loadSavedReports();
+    if (page === 'reports') { closeReportViewer(); loadSavedReports(); }
     if (page === 'lab-test') initLabTestPage();
 }
 
@@ -91,11 +91,13 @@ async function loadSavedReports() {
             </div>
         `;
 
-        item.querySelector('.reveal-btn').addEventListener('click', () => {
+        item.querySelector('.reveal-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
             window.api.revealInFinder(r.file_path);
         });
 
-        item.querySelector('.delete-btn').addEventListener('click', async () => {
+        item.querySelector('.delete-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
             await window.api.deleteSavedReport(r.id);
             item.remove();
             if (!list.children.length) {
@@ -103,8 +105,173 @@ async function loadSavedReports() {
             }
         });
 
+        item.addEventListener('click', () => openReportViewer(r));
+
         list.appendChild(item);
     }
+}
+
+function closeReportViewer() {
+    document.getElementById('reportsListView').style.display = '';
+    document.getElementById('reportViewer').style.display = 'none';
+    updateBreadcrumb('Reports', null);
+    const breadcrumbP1 = document.getElementById('breadcrumbPage1');
+    if (breadcrumbP1) { breadcrumbP1.style.cursor = ''; breadcrumbP1.onclick = null; }
+}
+
+async function openReportViewer(r) {
+    const result = await window.api.readReportFile(r.file_path);
+    if (result.error) return;
+
+    document.getElementById('reportsListView').style.display = 'none';
+    document.getElementById('reportViewer').style.display = '';
+    updateBreadcrumb('Reports', escapeHtml(r.title));
+
+    const breadcrumbP1 = document.getElementById('breadcrumbPage1');
+    if (breadcrumbP1) {
+        breadcrumbP1.style.cursor = 'pointer';
+        breadcrumbP1.onclick = () => closeReportViewer();
+    }
+
+    const badgeClass = r.flakiness === 'Stable' ? 'stable'
+        : r.flakiness.startsWith('Probably') ? 'probably-flaky'
+        : 'flaky';
+
+    const summaryEl = document.getElementById('reportViewerSummary');
+    summaryEl.innerHTML = `
+        <div class="rpt-stat-row">
+            <div class="rpt-stat"><span class="rpt-stat-val">${r.total}</span><span class="rpt-stat-lbl">Total</span></div>
+            <div class="rpt-stat success"><span class="rpt-stat-val">${r.passed}</span><span class="rpt-stat-lbl">Passed</span></div>
+            <div class="rpt-stat failed"><span class="rpt-stat-val">${r.failed}</span><span class="rpt-stat-lbl">Failed</span></div>
+            <span class="saved-report-badge ${badgeClass} rpt-badge">${escapeHtml(r.flakiness)}</span>
+        </div>
+    `;
+
+    const parsed = r.type === 'run'
+        ? parseRunReport(result.content)
+        : parsePRWorkflowReport(result.content);
+
+    const bodyEl = document.getElementById('reportViewerBody');
+    bodyEl.innerHTML = '';
+
+    if (parsed.hints?.length) {
+        const hintsEl = document.createElement('div');
+        hintsEl.className = 'rpt-hints';
+        hintsEl.innerHTML = `<span class="rpt-hints-label">Probable root causes</span> ${parsed.hints.map(h => `<span class="rpt-hint-chip">${escapeHtml(h)}</span>`).join('')}`;
+        bodyEl.appendChild(hintsEl);
+    }
+
+    const rows = r.type === 'run'
+        ? renderRunRows(parsed.rows)
+        : renderWorkflowRows(parsed.rows);
+    bodyEl.appendChild(rows);
+}
+
+function parseRunReport(content) {
+    const rows = [];
+    const hints = [];
+    for (const line of content.split('\n')) {
+        if (line.startsWith('**Probable root causes:**')) {
+            hints.push(...line.replace('**Probable root causes:**', '').trim().split(', ').map(s => s.trim()).filter(Boolean));
+        }
+        if (!line.startsWith('| [')) continue;
+        const cells = line.split('|').map(c => c.trim()).filter(Boolean);
+        if (cells.length < 6) continue;
+        const runMatch = cells[0].match(/\[(\d+)\]\(([^)]+)\)/);
+        if (!runMatch) continue;
+        const success = cells[1].includes('✅');
+        const conclusion = cells[1].replace(/[✅❌]/g, '').trim();
+        const started = cells[2] === '—' ? null : cells[2];
+        const completed = cells[3] === '—' ? null : cells[3];
+        const rawTests = cells[4];
+        const tests = rawTests === '—' ? [] : rawTests.split(', ').map(s => s.trim()).filter(Boolean);
+        const artifactMatch = cells[5].match(/\[View logs →\]\(([^)]+)\)/);
+        rows.push({ number: parseInt(runMatch[1]), url: runMatch[2], success, conclusion, started, completed, tests, artifactUrl: artifactMatch?.[1] ?? null });
+    }
+    return { rows, hints };
+}
+
+function parsePRWorkflowReport(content) {
+    const rows = [];
+    for (const line of content.split('\n')) {
+        if (!line.startsWith('| #')) continue;
+        const cells = line.split('|').map(c => c.trim()).filter(Boolean);
+        if (cells.length < 4) continue;
+        const attempt = parseInt(cells[0].replace('#', ''));
+        const success = cells[1].includes('✅');
+        const inProgress = cells[1].includes('🔄');
+        const resultText = cells[1].replace(/[✅❌🔄]/g, '').trim();
+        const duration = cells[2];
+        const linkMatch = cells[3].match(/\[Open\]\(([^)]+)\)/);
+        rows.push({ attempt, success, inProgress, result: resultText, duration, url: linkMatch?.[1] ?? null });
+    }
+    return { rows };
+}
+
+function formatDuration(started, completed) {
+    if (!started || !completed) return null;
+    const ms = new Date(completed) - new Date(started);
+    if (isNaN(ms) || ms < 0) return null;
+    const s = Math.round(ms / 1000);
+    if (s < 60) return `${s}s`;
+    return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function renderRunRows(rows) {
+    const container = document.createElement('div');
+    container.className = 'rpt-runs-list';
+    for (const r of rows) {
+        const duration = formatDuration(r.started, r.completed);
+        const dateStr = r.started ? new Date(r.started).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+
+        const row = document.createElement('div');
+        row.className = `rpt-run-row ${r.success ? 'success' : 'failed'}`;
+        row.innerHTML = `
+            <span class="rpt-run-icon">${r.success ? '✅' : '❌'}</span>
+            <a class="rpt-run-num" href="#" title="Open in GitHub">Run #${r.number}</a>
+            <span class="rpt-run-conclusion">${escapeHtml(r.conclusion)}</span>
+            <span class="rpt-run-meta">${[dateStr, duration].filter(Boolean).map(s => escapeHtml(s)).join(' · ')}</span>
+            ${r.tests.length ? `<div class="rpt-run-tests">${r.tests.map(t => `<span class="rpt-test-chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+            ${r.artifactUrl ? `<a class="rpt-artifact-link" href="#">View logs</a>` : ''}
+        `;
+        row.querySelector('.rpt-run-num').addEventListener('click', (e) => {
+            e.preventDefault();
+            window.api.openExternal(r.url);
+        });
+        if (r.artifactUrl) {
+            row.querySelector('.rpt-artifact-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                window.api.openExternal(r.artifactUrl);
+            });
+        }
+        container.appendChild(row);
+    }
+    return container;
+}
+
+function renderWorkflowRows(rows) {
+    const container = document.createElement('div');
+    container.className = 'rpt-runs-list';
+    for (const r of rows) {
+        const icon = r.success ? '✅' : r.inProgress ? '🔄' : '❌';
+        const row = document.createElement('div');
+        row.className = `rpt-run-row ${r.success ? 'success' : r.inProgress ? '' : 'failed'}`;
+        row.innerHTML = `
+            <span class="rpt-run-icon">${icon}</span>
+            <span class="rpt-run-num">Attempt #${r.attempt}</span>
+            <span class="rpt-run-conclusion">${escapeHtml(r.result)}</span>
+            <span class="rpt-run-meta">${escapeHtml(r.duration)}</span>
+            ${r.url ? `<a class="rpt-artifact-link" href="#">Open</a>` : ''}
+        `;
+        if (r.url) {
+            row.querySelector('.rpt-artifact-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                window.api.openExternal(r.url);
+            });
+        }
+        container.appendChild(row);
+    }
+    return container;
 }
 
 document.getElementById('sidebarUser')?.addEventListener('click', () => {
@@ -219,6 +386,7 @@ initUser();
 loadUserPRs();
 loadPRStats();
 initLabTest();
+initStatTooltips();
 
 // ── PRs ─ see renderer/pages/prs.js ─ Dashboard ─ see renderer/pages/dashboard.js ──
 

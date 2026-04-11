@@ -124,7 +124,11 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
                                 </svg>
                             </div>
-                            <span class="stat-card-trend up">+12%</span>
+                        </div>
+                        <button class="stat-info-btn" aria-label="More info">i</button>
+                        <div class="stat-tooltip" role="tooltip">
+                            <strong>Total PRs</strong>
+                            <p>Your open PRs currently visible in the My PRs section. Updated each time the list is loaded.</p>
                         </div>
                         <div class="stat-card-value" id="totalPRs">0</div>
                         <div class="stat-card-label">Total PRs</div>
@@ -136,7 +140,11 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
                                 </svg>
                             </div>
-                            <span class="stat-card-trend up">+8%</span>
+                        </div>
+                        <button class="stat-info-btn" aria-label="More info">i</button>
+                        <div class="stat-tooltip" role="tooltip">
+                            <strong>Total Runs</strong>
+                            <p>Number of workflow runs currently being monitored. Includes in-progress and completed runs in this session.</p>
                         </div>
                         <div class="stat-card-value" id="totalRuns">0</div>
                         <div class="stat-card-label">Total Runs</div>
@@ -148,7 +156,11 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                                 </svg>
                             </div>
-                            <span class="stat-card-trend down">-5%</span>
+                        </div>
+                        <button class="stat-info-btn" aria-label="More info">i</button>
+                        <div class="stat-tooltip" role="tooltip">
+                            <strong>Failures</strong>
+                            <p>Monitored runs with a <code>failure</code> conclusion. Calculated across all active runs in this session.</p>
                         </div>
                         <div class="stat-card-value" id="totalFailures">0</div>
                         <div class="stat-card-label">Failures</div>
@@ -160,6 +172,11 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
                                 </svg>
                             </div>
+                        </div>
+                        <button class="stat-info-btn" aria-label="More info">i</button>
+                        <div class="stat-tooltip" role="tooltip">
+                            <strong>Flaky Rate</strong>
+                            <p>Percentage of failed runs over total monitored runs. Formula: <code>failures ÷ total runs × 100</code>.</p>
                         </div>
                         <div class="stat-card-value" id="flakyRate">0%</div>
                         <div class="stat-card-label">Flaky Rate</div>
@@ -180,6 +197,11 @@
                                 <div class="pr-stat-value" id="statTotalRuns">0</div>
                                 <div class="pr-stat-label">Total Runs</div>
                             </div>
+                            <button class="stat-info-btn" aria-label="More info">i</button>
+                            <div class="stat-tooltip" role="tooltip">
+                                <strong>Total Runs</strong>
+                                <p>Total workflow runs triggered by this PR across all commits.</p>
+                            </div>
                         </div>
                         <div class="pr-stat-card" id="prStatDuration">
                             <div class="pr-stat-icon">
@@ -190,6 +212,11 @@
                             <div class="pr-stat-content">
                                 <div class="pr-stat-value" id="statTotalDuration">0m</div>
                                 <div class="pr-stat-label">Total CI Time</div>
+                            </div>
+                            <button class="stat-info-btn" aria-label="More info">i</button>
+                            <div class="stat-tooltip" role="tooltip">
+                                <strong>Total CI Time</strong>
+                                <p>Cumulative time spent running CI for this PR across all workflow runs.</p>
                             </div>
                         </div>
                         <div class="pr-stat-card" id="prStatFailureRate">
@@ -202,6 +229,11 @@
                                 <div class="pr-stat-value" id="statFailureRate">0%</div>
                                 <div class="pr-stat-label">Failure Rate</div>
                             </div>
+                            <button class="stat-info-btn" aria-label="More info">i</button>
+                            <div class="stat-tooltip" role="tooltip">
+                                <strong>Failure Rate</strong>
+                                <p>Percentage of workflow runs that ended with a <code>failure</code> conclusion for this PR.</p>
+                            </div>
                         </div>
                         <div class="pr-stat-card" id="prStatPainIndex">
                             <div class="pr-stat-icon pain">
@@ -212,6 +244,11 @@
                             <div class="pr-stat-content">
                                 <div class="pr-stat-value" id="statPainIndex">0</div>
                                 <div class="pr-stat-label">CI Pain Index</div>
+                            </div>
+                            <button class="stat-info-btn" aria-label="More info">i</button>
+                            <div class="stat-tooltip" role="tooltip">
+                                <strong>CI Pain Index</strong>
+                                <p>A combined score based on failure rate and total CI time. Higher means more CI friction on this PR.</p>
                             </div>
                         </div>
                     </div>
@@ -402,11 +439,15 @@
 
             <!-- Reports Page -->
             <section class="page-section" id="pageReports">
-                <div class="saved-reports-section">
+                <div id="reportsListView" class="saved-reports-section">
                     <div class="saved-reports-header">Saved Reports</div>
                     <div class="saved-reports-list" id="savedReportsList">
                         <div class="saved-reports-empty">No reports saved yet. Save a report from a run to see it here.</div>
                     </div>
+                </div>
+                <div id="reportViewer" style="display:none">
+                    <div class="report-viewer-summary" id="reportViewerSummary"></div>
+                    <div class="report-viewer-body" id="reportViewerBody"></div>
                 </div>
             </section>
 
