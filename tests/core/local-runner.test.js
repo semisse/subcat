@@ -65,6 +65,30 @@ describe('LocalRunner.checkDocker()', () => {
     });
 });
 
+// ── LocalRunner.isPlaywright ──────────────────────────────────────────────────
+
+describe('LocalRunner.isPlaywright()', () => {
+    test('returns true for "npx playwright test"', () => {
+        expect(LocalRunner.isPlaywright('npx playwright test')).toBe(true);
+    });
+
+    test('returns true for "playwright test --grep=@smoke"', () => {
+        expect(LocalRunner.isPlaywright('playwright test --grep=@smoke')).toBe(true);
+    });
+
+    test('returns false for "npx nx test myapp"', () => {
+        expect(LocalRunner.isPlaywright('npx nx test myapp')).toBe(false);
+    });
+
+    test('returns false for "npx jest"', () => {
+        expect(LocalRunner.isPlaywright('npx jest')).toBe(false);
+    });
+
+    test('returns false for "npx vitest run"', () => {
+        expect(LocalRunner.isPlaywright('npx vitest run')).toBe(false);
+    });
+});
+
 // ── LocalRunner.detectImage ───────────────────────────────────────────────────
 
 describe('LocalRunner.detectImage()', () => {
@@ -113,12 +137,13 @@ describe('LocalRunner.detectImage()', () => {
     });
 });
 
-// ── LocalRunner._parseResults ─────────────────────────────────────────────────
+// ── LocalRunner._parseResults (Playwright) ───────────────────────────────────
 
-describe('LocalRunner._parseResults()', () => {
+describe('LocalRunner._parseResults() — Playwright', () => {
     let runner;
     beforeEach(() => {
         runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test' });
+        runner._isPlaywright = true;
     });
 
     test('parses "5 passed" correctly', () => {
@@ -151,6 +176,93 @@ describe('LocalRunner._parseResults()', () => {
     test('returns zeros when output has no summary', () => {
         const r = runner._parseResults(['some random output', 'without test summary']);
         expect(r).toEqual({ passed: 0, failed: 0, flaky: 0, failedTestNames: [] });
+    });
+});
+
+// ── LocalRunner._parseResults (Jest/Nx loop) ─────────────────────────────────
+
+describe('LocalRunner._parseResults() — Jest/Nx loop mode', () => {
+    let runner;
+    beforeEach(() => {
+        runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 3 });
+        runner._isPlaywright = false;
+    });
+
+    test('sums passed counts across N iterations', () => {
+        const lines = [
+            'Tests: 5 passed, 5 total',
+            'Tests: 5 passed, 5 total',
+            'Tests: 5 passed, 5 total',
+        ];
+        const r = runner._parseResults(lines);
+        expect(r.passed).toBe(15);
+    });
+
+    test('sums failed counts across N iterations', () => {
+        const lines = [
+            'Tests: 1 failed, 4 passed, 5 total',
+            'Tests: 0 failed, 5 passed, 5 total',
+            'Tests: 2 failed, 3 passed, 5 total',
+        ];
+        const r = runner._parseResults(lines);
+        expect(r.failed).toBe(3);
+        expect(r.passed).toBe(12);
+    });
+
+    test('flaky is always 0 for non-Playwright', () => {
+        const r = runner._parseResults(['Tests: 5 passed, 5 total']);
+        expect(r.flaky).toBe(0);
+    });
+
+    test('returns zeros when no summary lines present', () => {
+        const r = runner._parseResults(['PASS src/foo.test.js', 'some output']);
+        expect(r).toEqual({ passed: 0, failed: 0, flaky: 0, failedTestNames: [] });
+    });
+});
+
+// ── LocalRunner shell command (Playwright vs loop) ────────────────────────────
+
+describe('LocalRunner.start() — shell command selection', () => {
+    function captureDockerArgs() {
+        const calls = [];
+        mockSpawnImpl = jest.fn((...args) => {
+            calls.push(args);
+            return makeFakeProcess();
+        });
+        return calls;
+    }
+
+    test('Playwright with repeat uses --repeat-each flag', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 5 });
+        runner.on('done', () => {});
+        await runner.start();
+
+        const dockerRunCall = calls.find(([cmd]) => cmd === 'docker');
+        const shCmd = dockerRunCall[1].at(-1);
+        expect(shCmd).toBe('npx playwright test --repeat-each=5');
+    });
+
+    test('non-Playwright with repeat uses shell loop', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 3 });
+        runner.on('done', () => {});
+        await runner.start();
+
+        const dockerRunCall = calls.find(([cmd]) => cmd === 'docker');
+        const shCmd = dockerRunCall[1].at(-1);
+        expect(shCmd).toBe('for i in $(seq 1 3); do npx nx test myapp; done');
+    });
+
+    test('non-Playwright with repeat=1 runs command directly', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1 });
+        runner.on('done', () => {});
+        await runner.start();
+
+        const dockerRunCall = calls.find(([cmd]) => cmd === 'docker');
+        const shCmd = dockerRunCall[1].at(-1);
+        expect(shCmd).toBe('npx nx test myapp');
     });
 });
 

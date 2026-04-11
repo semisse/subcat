@@ -54,7 +54,7 @@ function register({ db, getWindow }) {
                 completedAt: new Date().toISOString(),
             });
             activeRunners.delete(id);
-            getWindow()?.webContents.send('local-run:done', { id, results });
+            getWindow()?.webContents.send('local-run:done', { id, results: { ...results, repeat } });
         });
 
         runner.on('error', (err) => {

@@ -114,6 +114,20 @@
             flex-shrink: 0;
         }
 
+        .nav-beta-pill {
+            margin-left: auto;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: rgba(134, 140, 255, 0.2);
+            color: #868cff;
+            border: 1px solid rgba(134, 140, 255, 0.35);
+            line-height: 1.4;
+        }
+
         .sidebar-footer {
             padding: 16px 12px;
             border-top: 1px solid var(--border-color);
@@ -2503,8 +2517,8 @@
 #pageLabtest[data-state="idle"]    .lab-test-done    { display: none; }
 #pageLabtest[data-state="running"] .lab-test-form,
 #pageLabtest[data-state="running"] .lab-test-done    { display: none; }
-#pageLabtest[data-state="done"]    .lab-test-form,
-#pageLabtest[data-state="done"]    .lab-test-running { display: none; }
+#pageLabtest[data-state="done"]    .lab-test-form { display: none; }
+#pageLabtest[data-state="done"]    .lab-test-running-header { display: none; }
 
 .lab-test-field {
     display: flex;
@@ -2521,17 +2535,19 @@
 }
 .lab-test-field input[type="text"],
 .lab-test-field input[type="number"] {
-    background: var(--bg-input, var(--bg-secondary));
+    background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     color: var(--text-primary);
     font-family: 'SF Mono', 'Menlo', monospace;
     font-size: 13px;
-    padding: 6px 10px;
+    padding: 8px 12px;
     outline: none;
+    transition: all 0.2s;
 }
 .lab-test-field input:focus {
-    border-color: var(--accent-blue, #4f93f5);
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 0 3px var(--accent-purple-dim);
 }
 
 .lab-test-path-row {
@@ -2579,6 +2595,59 @@
     color: var(--text-secondary);
     font-family: 'SF Mono', 'Menlo', monospace;
     font-size: 12px;
+}
+
+/* Lab test buttons */
+#pageLabtest button.btn-primary,
+#pageLabtest button.btn-secondary,
+#pageLabtest button.btn-danger {
+    align-items: center;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    transition: all 0.2s;
+}
+
+#pageLabtest button.btn-secondary {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+#pageLabtest button.btn-secondary:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-color-hover);
+    color: var(--text-primary);
+}
+
+#pageLabtest button.btn-primary {
+    background: linear-gradient(135deg, #868cff 0%, #4318ff 100%);
+    border: none;
+    color: white;
+    font-weight: 600;
+}
+#pageLabtest button.btn-primary:hover {
+    box-shadow: 0 4px 16px rgba(67, 24, 255, 0.45);
+    transform: translateY(-1px);
+}
+#pageLabtest button.btn-primary:disabled {
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.5;
+    transform: none;
+}
+
+#pageLabtest button.btn-danger {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+#pageLabtest button.btn-danger:hover {
+    background: rgba(244, 63, 94, 0.1);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
 }
 
 .lab-test-actions { display: flex; justify-content: flex-end; }
@@ -2638,6 +2707,12 @@
 .badge-stable        { background: color-mix(in srgb, var(--accent-green) 20%, transparent); color: var(--accent-green); }
 .badge-probably-flaky { background: color-mix(in srgb, var(--accent-yellow) 20%, transparent); color: var(--accent-yellow); }
 .badge-flaky         { background: color-mix(in srgb, var(--accent-red) 20%, transparent); color: var(--accent-red); }
+
+.lab-result-runs {
+    color: var(--text-secondary);
+    font-size: 11px;
+    margin-bottom: 8px;
+}
 
 .lab-result-counts {
     display: flex;

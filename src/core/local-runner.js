@@ -30,6 +30,10 @@ class LocalRunner extends EventEmitter {
         });
     }
 
+    static isPlaywright(testCommand) {
+        return /playwright/.test(testCommand);
+    }
+
     static detectImage(repoPath) {
         try {
             const pkgPath = path.join(repoPath, 'package.json');
@@ -50,6 +54,18 @@ class LocalRunner extends EventEmitter {
 
     async start() {
         const image = await LocalRunner.detectImage(this.repoPath);
+        this._isPlaywright = LocalRunner.isPlaywright(this.testCommand);
+
+        let shellCmd;
+        if (this._isPlaywright) {
+            shellCmd = this.repeat > 1
+                ? `${this.testCommand} --repeat-each=${this.repeat}`
+                : this.testCommand;
+        } else {
+            shellCmd = this.repeat > 1
+                ? `for i in $(seq 1 ${this.repeat}); do ${this.testCommand}; done`
+                : this.testCommand;
+        }
 
         const args = [
             'run', '--rm',
@@ -63,9 +79,7 @@ class LocalRunner extends EventEmitter {
             '-w', '/app',
             image,
             'sh', '-c',
-            this.repeat > 1
-                ? `${this.testCommand} --repeat-each=${this.repeat}`
-                : this.testCommand,
+            shellCmd,
         ];
 
         this._process = spawn('docker', args);
@@ -80,9 +94,18 @@ class LocalRunner extends EventEmitter {
             stdoutBuf = parts.pop(); // keep incomplete line
             for (const line of parts) {
                 this._addLine(line);
-                if (/^\s+[✓✘·-]/.test(line)) {
-                    completedCount++;
-                    this.emit('progress', { completed: completedCount, total: this.repeat });
+                if (this._isPlaywright) {
+                    // Playwright: count individual test result lines
+                    if (/^\s+[✓✘·-]/.test(line)) {
+                        completedCount++;
+                        this.emit('progress', { completed: completedCount, total: this.repeat });
+                    }
+                } else {
+                    // Jest/Vitest/Nx: count completed iterations via summary lines
+                    if (/\bTests:\s/.test(line)) {
+                        completedCount++;
+                        this.emit('progress', { completed: completedCount, total: this.repeat });
+                    }
                 }
             }
         });
@@ -125,13 +148,21 @@ class LocalRunner extends EventEmitter {
     _parseResults(lines) {
         const text = lines.join('\n');
 
-        const passedMatch = text.match(/(\d+) passed/);
-        const failedMatch = text.match(/(\d+) failed/);
-        const flakyMatch  = text.match(/(\d+) flaky/);
-
-        const passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
-        const failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
-        const flaky  = flakyMatch  ? parseInt(flakyMatch[1],  10) : 0;
+        let passed, failed, flaky;
+        if (this._isPlaywright) {
+            // Playwright prints a single summary at the end with total counts
+            const passedMatch = text.match(/(\d+) passed/);
+            const failedMatch = text.match(/(\d+) failed/);
+            const flakyMatch  = text.match(/(\d+) flaky/);
+            passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
+            failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
+            flaky  = flakyMatch  ? parseInt(flakyMatch[1],  10) : 0;
+        } else {
+            // Jest/Vitest/Nx loop: N summary lines — sum all occurrences
+            passed = [...text.matchAll(/(\d+) passed/g)].reduce((s, m) => s + parseInt(m[1], 10), 0);
+            failed = [...text.matchAll(/(\d+) failed/g)].reduce((s, m) => s + parseInt(m[1], 10), 0);
+            flaky  = 0;
+        }
 
         const failedTestNames = [];
         for (const line of lines) {

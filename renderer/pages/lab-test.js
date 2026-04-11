@@ -136,14 +136,18 @@ function renderDoneState(results) {
         return;
     }
 
-    const repeat = parseInt(document.getElementById('labTestRepeat')?.value, 10) || 10;
-    const total = results.passed + results.failed + results.flaky;
+    const repeat = results.repeat || parseInt(document.getElementById('labTestRepeat')?.value, 10) || 1;
+    const perRun = (n) => repeat > 1 ? Math.round(n / repeat) : n;
+    const passedPerRun = perRun(results.passed);
+    const failedPerRun = perRun(results.failed);
+    const flakyPerRun  = perRun(results.flaky);
+    const totalPerRun  = passedPerRun + failedPerRun + flakyPerRun;
 
     // Flakiness badge — adapt flakinessSummary logic for local runs
     let flakinessLabel;
-    if (results.failed === 0 && results.flaky === 0) {
+    if (failedPerRun === 0 && flakyPerRun === 0) {
         flakinessLabel = 'Stable';
-    } else if (results.failed < total / 2) {
+    } else if (failedPerRun < totalPerRun / 2) {
         flakinessLabel = 'Probably flaky';
     } else {
         flakinessLabel = 'Flaky';
@@ -152,12 +156,15 @@ function renderDoneState(results) {
         : flakinessLabel === 'Probably flaky' ? 'badge-probably-flaky'
         : 'badge-flaky';
 
+    const runsLabel = repeat > 1 ? `<div class="lab-result-runs">Results for ${repeat} runs</div>` : '';
+
     let html = `
         <div class="lab-result-badge ${badgeClass}">${escapeHtml(flakinessLabel)}</div>
+        ${runsLabel}
         <div class="lab-result-counts">
-            <span class="count-pass">${results.passed} passed</span>
-            <span class="count-fail">${results.failed} failed</span>
-            <span class="count-flaky">${results.flaky} flaky</span>
+            <span class="count-pass">${passedPerRun} passed</span>
+            <span class="count-fail">${failedPerRun} failed</span>
+            <span class="count-flaky">${flakyPerRun} flaky</span>
         </div>
     `;
 
