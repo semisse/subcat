@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.2.0] — 2026-04-17
+
+### Added
+- **Lab Test** — run stress tests locally via Docker; execute a shell command N times and see live output with pass/fail/flaky counts
+- **Lab Test: multi-runner support** — auto-detects Playwright (`--repeat-each`) vs Jest/Vitest/Nx (shell loop), so Lab Test works with any test runner
+- **Lab Test: run history** — browse, inspect, and delete past local test runs
+- **Lab Test: stress factors** — configure stress parameters and see Docker status chip
+- **Report drill-down viewer** — click any saved report to see a full detail view with flakiness badges, artifacts, and root cause hints
+- **Profile page** — view your GitHub profile, credits balance, and usage stats
+- **Dashboard stat tooltips** — hover any stat card for an explanation of the metric
+- **E2E test suite** — 44 Playwright specs across 10 files covering auth, watch, PRs, pinned workflows, notifications, run lifecycle, reports, dashboard stats, and Lab Test
+
+### Changed
+- **Renderer refactor** — `renderer.js` split from 2221 lines into 11 focused modules; zero build step preserved (multiple `<script>` tags with shared globals)
+- **Architecture cleanup** — clear separation between `src/core/` (platform-agnostic), `src/electron/` (Electron-specific), and `src/db/` (SQLite)
+- Workflow poll interval increased for better performance
+
+### Fixed
+- Empty states for My PRs and Runs sections after nav border shift
+- Release pipeline now uses PAT to push tags so `release.yml` triggers correctly
+
+### Testing
+- 262 unit tests + 44 E2E specs passing
+- E2E infrastructure: mock server with response sequencing, fixture factories, 1s poll interval via `SUBCAT_POLL_INTERVAL_MS`
+- `confirm-dialog` auto-confirms in E2E mode (`SUBCAT_E2E`)
+
 ## [1.1.0] — 2026-04-10
 
 ### Added
