@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/subcat.png" width="120" alt="SubCat">
+  <img src="assets/subcat-welcome.png" width="120" alt="SubCat">
 </p>
 
 # SubCat
@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://github.com/sponsors/semisse"><img src="https://img.shields.io/badge/sponsor-♥-ea4aaa?style=flat-square" alt="Sponsor"></a>
   <a href="https://ko-fi.com/semisse"><img src="https://img.shields.io/badge/Ko--fi-donate-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://buymeacoffee.com/semisse"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
 A desktop app for developers who live in GitHub Actions. SubCat watches your CI runs, notifies you when they finish, and helps you hunt down flaky tests — both in the cloud and locally.

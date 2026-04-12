@@ -32,7 +32,7 @@ if (isMac) {
         applicationVersion: app.getVersion(),
         copyright: '© Samuel Fialho',
         tagline: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
-        credits: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
+        credits: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.\n\nSupport SubCat:\n♥ github.com/sponsors/semisse\n☕ ko-fi.com/semisse\n☕ buymeacoffee.com/semisse',
         website: 'https://github.com/semisse/subcat',
         iconPath: path.join(__dirname, '../../assets', 'Icon-iOS-Default-1024x1024@1x.png'),
     });
@@ -282,7 +282,7 @@ ipcMain.handle('show-about', () => {
             type: 'info',
             title: 'About SubCat',
             message: `SubCat ${app.getVersion()}`,
-            detail: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.\n\n© Samuel Fialho\nhttps://github.com/semisse/subcat',
+            detail: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.\n\n© Samuel Fialho\nhttps://github.com/semisse/subcat\n\nSupport SubCat:\n♥ github.com/sponsors/semisse\n☕ ko-fi.com/semisse\n☕ buymeacoffee.com/semisse',
             buttons: ['OK'],
             defaultId: 0
         });
