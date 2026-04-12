@@ -76,3 +76,7 @@ function formatRelativeTime(isoString) {
     if (hrs < 24) return `${hrs}h ago`;
     return `${Math.floor(hrs / 24)}d ago`;
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { escapeHtml, isPRUrl, parseGitHubRunUrl, isWorkflowUrl, getCardClass, formatStatus, flakinessSummary, formatRelativeTime, STATUS_LABELS, FLAKINESS_THRESHOLD_PCT };
+}
