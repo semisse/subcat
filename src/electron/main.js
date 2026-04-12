@@ -261,7 +261,9 @@ ipcMain.handle('open-external', async (event, url) => {
     const allowed = [
         'https://github.com/',
         'https://subcat.todaywedream.com',
-        'https://todaywedream.com'
+        'https://todaywedream.com',
+        'https://ko-fi.com/semisse',
+        'https://buymeacoffee.com/semisse',
     ];
     if (allowed.some(prefix => url.startsWith(prefix))) shell.openExternal(url);
 });

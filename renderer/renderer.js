@@ -79,7 +79,7 @@ async function loadProfilePage() {
     }
 }
 
-document.querySelectorAll('.credits-link').forEach(link => {
+document.querySelectorAll('.credits-link, .credits-donate-link').forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
         window.api.openExternal(link.dataset.url);
