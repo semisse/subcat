@@ -411,6 +411,163 @@ describe('LocalRunner.start() — shell command selection', () => {
         expect(shCmd).not.toContain('tc qdisc');
     });
 
+    // ── Stress factors — cpuStress ─────────────────────────────────────────────
+
+    test('cpuStress: prepends stress-ng background command to shell command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, cpuStress: 2 });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toContain('stress-ng --cpu 2 --timeout 0 &');
+        expect(shCmd).toContain('npx nx test myapp');
+    });
+
+    test('cpuStress: null does not add stress-ng command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, cpuStress: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).not.toContain('stress-ng');
+    });
+
+    // ── Stress factors — packetLoss ─────────────────────────────────────────────
+
+    test('packetLoss: adds --cap-add NET_ADMIN to Docker args', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, packetLoss: 5 });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        expect(args).toContain('--cap-add');
+        expect(args[args.indexOf('--cap-add') + 1]).toBe('NET_ADMIN');
+    });
+
+    test('packetLoss: adds tc netem loss N% to shell command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, packetLoss: 10 });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toContain('netem');
+        expect(shCmd).toContain('loss 10%');
+    });
+
+    test('packetLoss: null does not add loss or NET_ADMIN', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, packetLoss: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        const shCmd = getShellCmd(calls);
+        expect(args).not.toContain('--cap-add');
+        expect(shCmd).not.toContain('loss');
+    });
+
+    // ── Stress factors — staleRead ──────────────────────────────────────────────
+
+    test('staleRead: adds --cap-add NET_ADMIN to Docker args', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, staleRead: 200 });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        expect(args).toContain('--cap-add');
+    });
+
+    test('staleRead: adds tc netem delay with reorder to shell command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, staleRead: 300 });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toContain('delay 300ms 25% reorder 50% 25%');
+    });
+
+    test('staleRead: null does not add reorder params', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, staleRead: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).not.toContain('reorder');
+    });
+
+    // ── envFile ─────────────────────────────────────────────────────────────────
+
+    test('envFile: mounts file read-only and sources it in shell command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npm test', repeat: 1, envFile: '/path/to/.env' });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        // Mounted as read-only volume
+        const vIdx = args.indexOf('/path/to/.env:/tmp/subcat.env:ro');
+        expect(vIdx).toBeGreaterThan(-1);
+        expect(args[vIdx - 1]).toBe('-v');
+        // Sourced inside the shell command
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toContain('set -a && . /tmp/subcat.env && set +a');
+    });
+
+    test('envFile: null does not mount or source env file', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npm test', repeat: 1, envFile: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        expect(args.join(' ')).not.toContain('subcat.env');
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).not.toContain('set -a');
+    });
+
+    // ── installCommand ─────────────────────────────────────────────────────────
+
+    test('installCommand: prepended to shell command before tests', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npm test', repeat: 1, installCommand: 'npm ci' });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toMatch(/^npm ci && /);
+    });
+
+    test('installCommand: null does not prepend anything', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npm test', repeat: 1, installCommand: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toBe('npm test');
+    });
+
+    // ── Stress factors — netem combinations ─────────────────────────────────────
+
+    test('networkLatency + packetLoss: combined into single tc netem command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, networkLatency: 100, packetLoss: 5 });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toContain('delay 100ms 20ms');
+        expect(shCmd).toContain('loss 5%');
+        // Single tc command, not two separate ones
+        expect(shCmd.match(/tc qdisc/g)).toHaveLength(1);
+    });
+
+    test('all netem factors combined into single tc command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, networkLatency: 50, packetLoss: 3, staleRead: 200 });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toContain('delay 50ms 20ms');
+        expect(shCmd).toContain('loss 3%');
+        expect(shCmd).toContain('delay 200ms 25% reorder 50% 25%');
+        expect(shCmd.match(/tc qdisc/g)).toHaveLength(1);
+    });
+
     // ── Stress factors — combinations ──────────────────────────────────────────
 
     test('randomize + maxWorkers + timezone combined', async () => {

@@ -3012,6 +3012,7 @@
     justify-content: space-between;
 }
 
+
 .lab-stress-complete-btn {
     background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--accent-yellow) 35%, transparent);

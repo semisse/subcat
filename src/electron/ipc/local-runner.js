@@ -28,10 +28,20 @@ function register({ db, getWindow }) {
         return result.filePaths[0];
     });
 
-    handle('local-run:start', async (event, { repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency }) => {
+    handle('local-run:browse-env-file', async () => {
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile', 'showHiddenFiles', 'treatPackageAsDirectory'],
+            filters: [{ name: 'All Files', extensions: ['*'] }],
+            message: 'Select env file (use Cmd+Shift+. to reveal hidden files)',
+        });
+        if (result.canceled || !result.filePaths.length) return null;
+        return result.filePaths[0];
+    });
+
+    handle('local-run:start', async (event, { repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand }) => {
         const id = db.insertLocalRun({ repoPath, testCommand, cpus, memoryGb, repeat });
 
-        const runner = new LocalRunner({ repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency });
+        const runner = new LocalRunner({ repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand });
         activeRunners.set(id, runner);
 
         runner.on('line', (line) => {
@@ -67,6 +77,12 @@ function register({ db, getWindow }) {
         });
 
         runner.start();
+        // Emit docker command after returning id so renderer has activeRunId set
+        setImmediate(() => {
+            if (runner._dockerCmd) {
+                getWindow()?.webContents.send('local-run:output', { id, line: runner._dockerCmd });
+            }
+        });
         return { id };
     });
 

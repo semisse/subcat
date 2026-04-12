@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 class LocalRunner extends EventEmitter {
-    constructor({ repoPath, testCommand, repeat = 10, cpus = 2, memoryGb = 7, randomize = false, timezone = null, maxWorkers = null, ulimitNofile = null, networkLatency = null }) {
+    constructor({ repoPath, testCommand, repeat = 10, cpus = 2, memoryGb = 7, randomize = false, timezone = null, maxWorkers = null, ulimitNofile = null, networkLatency = null, cpuStress = null, packetLoss = null, staleRead = null, envFile = null, envTarget = null, installCommand = null }) {
         super();
         this.repoPath = repoPath;
         this.testCommand = testCommand;
@@ -16,6 +16,12 @@ class LocalRunner extends EventEmitter {
         this.maxWorkers = maxWorkers;
         this.ulimitNofile = ulimitNofile;
         this.networkLatency = networkLatency;
+        this.cpuStress = cpuStress;
+        this.packetLoss = packetLoss;
+        this.staleRead = staleRead;
+        this.envFile = envFile;
+        this.envTarget = envTarget;
+        this.installCommand = installCommand;
         this.containerName = `subcat-stress-${Date.now()}`;
         this._process = null;
         this._outputLines = [];
@@ -88,9 +94,48 @@ class LocalRunner extends EventEmitter {
                 : baseCmd;
         }
 
-        // Prepend network latency setup (requires --cap-add NET_ADMIN in Docker args)
-        if (this.networkLatency !== null) {
-            shellCmd = `apt-get install -y iproute2 -qq > /dev/null 2>&1; tc qdisc add dev eth0 root netem delay ${this.networkLatency}ms 20ms 2>/dev/null || true; ${shellCmd}`;
+        // Prepend setup steps to shell command (executed inside the container)
+        const setupParts = [];
+
+        // Load env file: export as env vars for the shell process
+        if (this.envFile) {
+            setupParts.push('set -a && . /tmp/subcat.env && set +a');
+        }
+
+        // Install dependencies inside the container (avoids host/Linux binary mismatch)
+        if (this.installCommand) {
+            setupParts.push(this.installCommand);
+        }
+
+        // apt packages needed for stress factors
+        const needsNetem = this.networkLatency !== null || this.packetLoss !== null || this.staleRead !== null;
+        const aptPkgs = [];
+        if (this.cpuStress !== null) aptPkgs.push('stress-ng');
+        if (needsNetem) aptPkgs.push('iproute2');
+        if (aptPkgs.length) {
+            setupParts.push(`apt-get update -qq > /dev/null 2>&1 && apt-get install -y ${aptPkgs.join(' ')} -qq > /dev/null 2>&1`);
+        }
+
+        // CPU stress: run stress-ng in background to create real CPU contention
+        // Backgrounded with &, so it must be joined with ; not && (& is already a separator)
+        let cpuStressPrefix = '';
+        if (this.cpuStress !== null) {
+            cpuStressPrefix = `stress-ng --cpu ${this.cpuStress} --timeout 0 & `;
+        }
+
+        // Network stress setup (requires --cap-add NET_ADMIN in Docker args)
+        if (needsNetem) {
+            const netemParts = ['tc qdisc add dev eth0 root netem'];
+            if (this.networkLatency !== null) netemParts.push(`delay ${this.networkLatency}ms 20ms`);
+            if (this.packetLoss !== null) netemParts.push(`loss ${this.packetLoss}%`);
+            if (this.staleRead !== null) netemParts.push(`delay ${this.staleRead}ms 25% reorder 50% 25%`);
+            setupParts.push(`${netemParts.join(' ')} 2>/dev/null || true`);
+        }
+
+        if (setupParts.length) {
+            shellCmd = setupParts.join(' && ') + ' && ' + cpuStressPrefix + shellCmd;
+        } else if (cpuStressPrefix) {
+            shellCmd = cpuStressPrefix + shellCmd;
         }
 
         const args = [
@@ -100,7 +145,6 @@ class LocalRunner extends EventEmitter {
             `--memory=${this.memoryGb}g`,
             `--memory-swap=${this.memoryGb}g`,
             '--shm-size=1g',
-            '-e', 'CI=true',
         ];
 
         if (this.timezone) {
@@ -111,12 +155,28 @@ class LocalRunner extends EventEmitter {
             args.push('--ulimit', `nofile=${this.ulimitNofile}:${this.ulimitNofile}`);
         }
 
-        if (this.networkLatency !== null) {
+        if (needsNetem) {
             args.push('--cap-add', 'NET_ADMIN');
+        }
+
+        if (this.envFile) {
+            args.push('-v', `${this.envFile}:/tmp/subcat.env:ro`);
+            if (this.envTarget) {
+                // Also mount over the project's .env so dotenv/Nx reads our values
+                // Strip repoPath prefix if user pasted an absolute path
+                let target = this.envTarget;
+                if (target.startsWith(this.repoPath)) {
+                    target = target.slice(this.repoPath.length).replace(/^\/+/, '');
+                }
+                args.push('-v', `${this.envFile}:/app/${target}:ro`);
+            }
         }
 
         args.push('-v', `${this.repoPath}:/app`, '-w', '/app', image, 'sh', '-c', shellCmd);
 
+        // Quote args that contain spaces/special chars for display purposes
+        const displayArgs = args.map(a => /[\s&|;$]/.test(a) ? `'${a}'` : a);
+        this._dockerCmd = `$ docker ${displayArgs.join(' ')}`;
         this._process = spawn('docker', args);
 
         let stdoutBuf = '';

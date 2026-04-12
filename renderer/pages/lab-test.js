@@ -39,6 +39,11 @@ function initLabTest() {
         }
     });
 
+    document.getElementById('labTestBrowseEnv')?.addEventListener('click', async () => {
+        const file = await window.api.browseEnvFile();
+        if (file) document.getElementById('labTestEnvFile').value = file;
+    });
+
     document.getElementById('labTestRunBtn')?.addEventListener('click', handleRun);
     document.getElementById('labTestStopBtn')?.addEventListener('click', handleStop);
     document.getElementById('labTestRunAgainBtn')?.addEventListener('click', handleRunAgain);
@@ -48,25 +53,37 @@ function initLabTest() {
 function handleCompleteStress(e) {
     e.stopPropagation(); // don't toggle the <details>
 
-    // Ensure the section is open
+    // Ensure the stress factors section is open
     const details = document.getElementById('labTestStressDetails');
     if (details) details.open = true;
 
     // Activate all checkboxes
-    const randomize = document.getElementById('labTestRandomize');
-    const ulimit    = document.getElementById('labTestUlimitEnabled');
+    const randomize  = document.getElementById('labTestRandomize');
+    const ulimit     = document.getElementById('labTestUlimitEnabled');
     const netLatency = document.getElementById('labTestNetworkLatencyEnabled');
-    if (randomize)   randomize.checked = true;
-    if (ulimit)      ulimit.checked    = true;
+    const cpuStress  = document.getElementById('labTestCpuStressEnabled');
+    const packetLoss = document.getElementById('labTestPacketLossEnabled');
+    const staleRead  = document.getElementById('labTestStaleReadEnabled');
+    if (randomize)   randomize.checked  = true;
+    if (ulimit)      ulimit.checked     = true;
     if (netLatency)  netLatency.checked = true;
+    if (cpuStress)   cpuStress.checked  = true;
+    if (packetLoss)  packetLoss.checked = true;
+    if (staleRead)   staleRead.checked  = true;
 
     // Set maximum stress values for numeric fields
-    const ulimitVal  = document.getElementById('labTestUlimitValue');
-    const latencyMs  = document.getElementById('labTestNetworkLatencyMs');
-    const maxWorkers = document.getElementById('labTestMaxWorkers');
-    if (ulimitVal)  ulimitVal.value  = '512';
-    if (latencyMs)  latencyMs.value  = '100';
-    if (maxWorkers) maxWorkers.value = '1';
+    const ulimitVal   = document.getElementById('labTestUlimitValue');
+    const latencyMs   = document.getElementById('labTestNetworkLatencyMs');
+    const maxWorkers  = document.getElementById('labTestMaxWorkers');
+    const cpuWorkers  = document.getElementById('labTestCpuStressWorkers');
+    const lossPercent = document.getElementById('labTestPacketLossPercent');
+    const staleMs     = document.getElementById('labTestStaleReadMs');
+    if (ulimitVal)   ulimitVal.value   = '512';
+    if (latencyMs)   latencyMs.value   = '100';
+    if (maxWorkers)  maxWorkers.value  = '1';
+    if (cpuWorkers)  cpuWorkers.value  = '2';
+    if (lossPercent) lossPercent.value = '5';
+    if (staleMs)     staleMs.value     = '200';
 
     // Timezone: pick a different timezone to force non-determinism
     const timezone = document.getElementById('labTestTimezone');
@@ -125,6 +142,15 @@ async function handleRun() {
     const ulimitNofile  = ulimitEnabled ? (parseInt(document.getElementById('labTestUlimitValue')?.value, 10) || 512) : null;
     const networkLatencyEnabled = document.getElementById('labTestNetworkLatencyEnabled')?.checked ?? false;
     const networkLatency = networkLatencyEnabled ? (parseInt(document.getElementById('labTestNetworkLatencyMs')?.value, 10) || 100) : null;
+    const cpuStressEnabled = document.getElementById('labTestCpuStressEnabled')?.checked ?? false;
+    const cpuStress = cpuStressEnabled ? (parseInt(document.getElementById('labTestCpuStressWorkers')?.value, 10) || 2) : null;
+    const packetLossEnabled = document.getElementById('labTestPacketLossEnabled')?.checked ?? false;
+    const packetLoss = packetLossEnabled ? (parseInt(document.getElementById('labTestPacketLossPercent')?.value, 10) || 5) : null;
+    const staleReadEnabled = document.getElementById('labTestStaleReadEnabled')?.checked ?? false;
+    const staleRead = staleReadEnabled ? (parseInt(document.getElementById('labTestStaleReadMs')?.value, 10) || 200) : null;
+    const envFile = document.getElementById('labTestEnvFile')?.value.trim() || null;
+    const envTarget = document.getElementById('labTestEnvTarget')?.value.trim() || null;
+    const installCommand = document.getElementById('labTestInstallCommand')?.value.trim() || null;
 
     if (!repoPath || !testCmd) return;
 
@@ -136,7 +162,7 @@ async function handleRun() {
     const outputEl = document.getElementById('labTestOutput');
     if (outputEl) outputEl.textContent = '';
 
-    const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency });
+    const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand });
     activeRunId = id;
 }
 

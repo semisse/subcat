@@ -397,19 +397,9 @@
                         <label for="labTestRepeat">Repeat</label>
                         <input type="number" id="labTestRepeat" value="10" min="1" max="100" style="width:80px">
                     </div>
-                    <details class="lab-test-resources">
-                        <summary>Resources</summary>
-                        <div class="lab-test-resources-row">
-                            <div class="lab-test-field">
-                                <label for="labTestCpus">CPU cores</label>
-                                <input type="number" id="labTestCpus" value="2" min="0.5" max="32" step="0.5" style="width:80px">
-                            </div>
-                            <div class="lab-test-field">
-                                <label for="labTestMemory">Memory GB</label>
-                                <input type="number" id="labTestMemory" value="7" min="1" max="64" step="1" style="width:80px">
-                            </div>
-                        </div>
-                    </details>
+                    <div class="lab-test-meta">
+                        <span id="labTestImage" class="lab-test-image"></span>
+                    </div>
                     <details class="lab-test-resources" id="labTestStressDetails">
                         <summary class="lab-test-stress-summary">
                             Stress factors
@@ -456,11 +446,63 @@
                                 <input type="number" id="labTestNetworkLatencyMs" value="100" min="10" max="2000" style="width:70px">
                                 <span class="lab-test-hint">ms ±20ms jitter via Docker networking</span>
                             </div>
+                            <div class="lab-test-stress-item">
+                                <label class="lab-stress-checkbox-label">
+                                    <input type="checkbox" id="labTestCpuStressEnabled">
+                                    CPU stress
+                                </label>
+                                <input type="number" id="labTestCpuStressWorkers" value="2" min="1" max="8" style="width:70px">
+                                <span class="lab-test-hint">Background stress-ng workers competing for CPU</span>
+                            </div>
+                            <div class="lab-test-stress-item">
+                                <label class="lab-stress-checkbox-label">
+                                    <input type="checkbox" id="labTestPacketLossEnabled">
+                                    Packet loss
+                                </label>
+                                <input type="number" id="labTestPacketLossPercent" value="5" min="1" max="50" style="width:70px">
+                                <span class="lab-test-hint">% of packets dropped · surfaces intermittent network failures</span>
+                            </div>
+                            <div class="lab-test-stress-item">
+                                <label class="lab-stress-checkbox-label">
+                                    <input type="checkbox" id="labTestStaleReadEnabled">
+                                    Stale read
+                                </label>
+                                <input type="number" id="labTestStaleReadMs" value="200" min="50" max="3000" style="width:70px">
+                                <span class="lab-test-hint">ms reorder delay · simulates eventual consistency across pods</span>
+                            </div>
                         </div>
                     </details>
-                    <div class="lab-test-meta">
-                        <span id="labTestImage" class="lab-test-image"></span>
-                    </div>
+                    <details class="lab-test-resources" id="labTestAdvancedDetails">
+                        <summary>Advanced configuration</summary>
+                        <div class="lab-test-field">
+                            <label for="labTestEnvFile">Env file</label>
+                            <div class="lab-test-path-row">
+                                <input type="text" id="labTestEnvFile" placeholder="/path/to/.env" spellcheck="false">
+                                <button id="labTestBrowseEnv" class="btn-secondary">Browse…</button>
+                            </div>
+                            <span class="lab-test-hint">Mounted read-only and sourced inside the container · secrets never stored</span>
+                        </div>
+                        <div class="lab-test-field">
+                            <label for="labTestEnvTarget">Env target path</label>
+                            <input type="text" id="labTestEnvTarget" placeholder="apps/my-app/.env" spellcheck="false">
+                            <span class="lab-test-hint">Relative path in repo · mounts env file over the project's .env so dotenv/Nx reads it</span>
+                        </div>
+                        <div class="lab-test-field">
+                            <label for="labTestInstallCommand">Install command</label>
+                            <input type="text" id="labTestInstallCommand" placeholder="npm install · npm ci · yarn install" spellcheck="false">
+                            <span class="lab-test-hint">Runs inside the container before tests · rebuilds native binaries for Linux</span>
+                        </div>
+                        <div class="lab-test-resources-row">
+                            <div class="lab-test-field">
+                                <label for="labTestCpus">CPU cores</label>
+                                <input type="number" id="labTestCpus" value="2" min="0.5" max="32" step="0.5" style="width:80px">
+                            </div>
+                            <div class="lab-test-field">
+                                <label for="labTestMemory">Memory GB</label>
+                                <input type="number" id="labTestMemory" value="7" min="1" max="64" step="1" style="width:80px">
+                            </div>
+                        </div>
+                    </details>
                     <div class="lab-test-actions">
                         <button id="labTestRunBtn" class="btn-primary" disabled>Run Stress Test</button>
                     </div>
