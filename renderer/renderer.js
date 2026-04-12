@@ -329,6 +329,10 @@ async function initUser() {
         if (authUsername) authUsername.textContent = status.login;
         const welcomeUsername = document.getElementById('welcomeUsername');
         if (welcomeUsername) welcomeUsername.textContent = status.login;
+        fetch('assets/welcome.json').then(r => r.json()).then(messages => {
+            const el = document.getElementById('welcomeSub');
+            if (el && messages.length) el.textContent = messages[Math.floor(Math.random() * messages.length)];
+        }).catch(() => {});
         if (authEmail) authEmail.textContent = status.email || `${status.login}@github.com`;
         if (status.avatarUrl) {
             if (authAvatar) {
