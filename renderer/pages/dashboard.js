@@ -1,5 +1,20 @@
 // ── Dashboard Page ──────────────────────────────────────────────────────────
 
+function initStatTooltips() {
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.stat-info-btn');
+        document.querySelectorAll('.stat-card[data-tooltip-open], .pr-stat-card[data-tooltip-open]').forEach(card => {
+            if (!btn || card !== btn.closest('.stat-card, .pr-stat-card')) {
+                card.removeAttribute('data-tooltip-open');
+            }
+        });
+        if (btn) {
+            btn.closest('.stat-card, .pr-stat-card').toggleAttribute('data-tooltip-open');
+            e.stopPropagation();
+        }
+    });
+}
+
 function updateDashboardStats() {
     const totalPRs = document.getElementById('totalPRs');
     const totalRuns = document.getElementById('totalRuns');

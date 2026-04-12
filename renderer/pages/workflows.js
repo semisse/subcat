@@ -193,8 +193,7 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     clearLevel3Poll();
 
     const isRefresh = currentWorkflow?.runId === workflow.runId &&
-                      currentView === 'workflow-runs' &&
-                      workflowRunsList.querySelector('.pr-detail-run:not([data-placeholder])');
+                      currentView === 'workflow-runs';
 
     currentWorkflow = workflow;
     workflowRunsBackTarget = backTarget;
@@ -381,7 +380,7 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
             } else {
                 clearLevel3Poll();
             }
-        }, 15000);
+        }, 30000);
     }
 
     updatePinBtnState();
