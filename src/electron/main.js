@@ -251,7 +251,7 @@ app.on('activate', () => {
 
 ipcAuth.register({ auth, storage, getWindow, getLoginWindow, setCurrentUser: u => { currentUser = u; }, createMainWindow, createLoginWindow });
 ipcRuns.register({ db, poller, storage, getWindow, getUser: () => currentUser });
-ipcReports.register({ db, getWindow });
+ipcReports.register({ db, getWindow, getToken: () => storage.loadToken() || undefined });
 ipcFlags.register();
 ipcLocalRunner.register({ db, getWindow });
 

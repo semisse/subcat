@@ -1,6 +1,6 @@
 jest.mock('https');
 const https = require('https');
-const { parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchFailedTests, fetchPRRuns, fetchRunAttempts, fetchWorkflowInfo, fetchLatestWorkflowRun, rerunWorkflow, rerunFailedJobs, cancelRun } = require('../../src/core/github');
+const { parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchFailedTests, fetchPRRuns, fetchRunAttempts, fetchWorkflowInfo, fetchLatestWorkflowRun, fetchRunArtifacts, rerunWorkflow, rerunFailedJobs, cancelRun } = require('../../src/core/github');
 
 // Helper to create a mock https response
 function mockResponse(statusCode, body) {
@@ -466,5 +466,34 @@ describe('fetchLatestWorkflowRun', () => {
     test('rejects on API error', async () => {
         mockResponse(403, {});
         await expect(fetchLatestWorkflowRun('owner', 'repo', 'ci.yml', 'token')).rejects.toThrow('GitHub API 403');
+    });
+});
+
+// ─── fetchRunArtifacts ────────────────────────────────────────────────────────
+
+describe('fetchRunArtifacts', () => {
+    test('returns mapped artifacts with URL', async () => {
+        mockResponse(200, { artifacts: [
+            { id: 1, name: 'test-results', archive_download_url: 'https://api.github.com/repos/o/r/actions/artifacts/1/zip' },
+            { id: 2, name: 'coverage', archive_download_url: 'https://api.github.com/repos/o/r/actions/artifacts/2/zip' },
+        ]});
+        const result = await fetchRunArtifacts('o', 'r', '42', 'token');
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({
+            id: 1,
+            name: 'test-results',
+            url: 'https://github.com/o/r/actions/runs/42#artifacts',
+        });
+    });
+
+    test('returns empty array when no artifacts', async () => {
+        mockResponse(200, { artifacts: [] });
+        const result = await fetchRunArtifacts('o', 'r', '42', 'token');
+        expect(result).toEqual([]);
+    });
+
+    test('rejects on API error', async () => {
+        mockResponse(403, {});
+        await expect(fetchRunArtifacts('o', 'r', '42', 'token')).rejects.toThrow('GitHub API 403');
     });
 });

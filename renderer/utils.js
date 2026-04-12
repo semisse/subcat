@@ -50,12 +50,21 @@ function formatStatus(status, conclusion) {
     return STATUS_LABELS[key] ?? (key ?? '').replace(/_/g, ' ');
 }
 
+const FLAKINESS_THRESHOLD_PCT = 2;
+
 function flakinessSummary(results, repeatTotal) {
     if (results.length < repeatTotal) return null;
     const failed = results.filter(r => r !== 'success').length;
+    const pct = repeatTotal > 0 ? Math.round((failed / repeatTotal) * 100) : 0;
     if (failed === 0) return { label: 'Stable', cls: 'flakiness-stable' };
-    if (failed < repeatTotal / 2) return { label: `Probably flaky — ${failed} failure${failed > 1 ? 's' : ''} in ${repeatTotal} runs`, cls: 'flakiness-warn' };
-    return { label: `Flaky — failed ${failed}/${repeatTotal} runs`, cls: 'flakiness-bad' };
+    if (pct < 50) return {
+        label: `Probably flaky — ${failed} of ${repeatTotal} runs failed (${pct}%) · threshold: ${FLAKINESS_THRESHOLD_PCT}%`,
+        cls: 'flakiness-warn',
+    };
+    return {
+        label: `Flaky — ${failed} of ${repeatTotal} runs failed (${pct}%) · threshold: ${FLAKINESS_THRESHOLD_PCT}%`,
+        cls: 'flakiness-bad',
+    };
 }
 
 function formatRelativeTime(isoString) {

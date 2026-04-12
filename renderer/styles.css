@@ -2074,6 +2074,36 @@
             margin-left: 4px;
         }
 
+        .rpt-stat-flakiness {
+            margin-left: auto;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .rpt-stat-flakiness-val {
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .rpt-stat-flakiness.stable {
+            border-color: rgba(34,197,94,0.35);
+            background: rgba(34,197,94,0.12);
+        }
+        .rpt-stat-flakiness.stable .rpt-stat-flakiness-val { color: #22c55e; }
+
+        .rpt-stat-flakiness.flaky {
+            border-color: rgba(239,68,68,0.35);
+            background: rgba(239,68,68,0.12);
+        }
+        .rpt-stat-flakiness.flaky .rpt-stat-flakiness-val { color: #ef4444; }
+
+        .rpt-stat-flakiness.probably-flaky {
+            border-color: rgba(234,179,8,0.35);
+            background: rgba(234,179,8,0.12);
+        }
+        .rpt-stat-flakiness.probably-flaky .rpt-stat-flakiness-val { color: #eab308; }
+
         .rpt-hints {
             display: flex;
             align-items: center;
@@ -2112,9 +2142,6 @@
             padding: 12px 16px;
             flex-wrap: wrap;
         }
-
-        .rpt-run-row.success { border-left: 3px solid var(--accent-green); }
-        .rpt-run-row.failed  { border-left: 3px solid var(--accent-red); }
 
         .rpt-run-icon {
             font-size: 14px;

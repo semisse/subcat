@@ -229,6 +229,15 @@ function rerunFailedJobs(owner, repo, runId, token) {
     });
 }
 
+async function fetchRunArtifacts(owner, repo, runId, token) {
+    const data = await githubGet(`/repos/${owner}/${repo}/actions/runs/${runId}/artifacts`, token);
+    return (data.artifacts ?? []).map(a => ({
+        id: a.id,
+        name: a.name,
+        url: `https://github.com/${owner}/${repo}/actions/runs/${runId}#artifacts`,
+    }));
+}
+
 async function fetchRunJobs(owner, repo, runId, attemptNumber, token) {
     const path = attemptNumber != null
         ? `/repos/${owner}/${repo}/actions/runs/${runId}/attempts/${attemptNumber}/jobs`
@@ -259,4 +268,4 @@ async function fetchPRReviews(owner, repo, prNumber, token) {
     };
 }
 
-module.exports = { delay, parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, fetchWorkflowInfo, fetchLatestWorkflowRun, fetchPRReviews, fetchRunJobs, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };
+module.exports = { delay, parseGitHubUrl, parsePRUrl, parseWorkflowUrl, githubGet, fetchRunStatus, fetchUserPRs, fetchPRRuns, fetchRunAttempts, fetchFailedTests, fetchWorkflowInfo, fetchLatestWorkflowRun, fetchPRReviews, fetchRunJobs, fetchRunArtifacts, triggerRerun, rerunWorkflow, rerunFailedJobs, cancelRun };

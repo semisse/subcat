@@ -127,6 +127,12 @@ async function openReportViewer(r) {
     document.getElementById('reportViewer').style.display = '';
     updateBreadcrumb('Reports', escapeHtml(r.title));
 
+    const titleEl = document.getElementById('reportViewerTitle');
+    if (titleEl) titleEl.textContent = r.title;
+
+    const backBtn = document.getElementById('reportViewerBack');
+    if (backBtn) backBtn.onclick = () => closeReportViewer();
+
     const breadcrumbP1 = document.getElementById('breadcrumbPage1');
     if (breadcrumbP1) {
         breadcrumbP1.style.cursor = 'pointer';
@@ -143,7 +149,7 @@ async function openReportViewer(r) {
             <div class="rpt-stat"><span class="rpt-stat-val">${r.total}</span><span class="rpt-stat-lbl">Total</span></div>
             <div class="rpt-stat success"><span class="rpt-stat-val">${r.passed}</span><span class="rpt-stat-lbl">Passed</span></div>
             <div class="rpt-stat failed"><span class="rpt-stat-val">${r.failed}</span><span class="rpt-stat-lbl">Failed</span></div>
-            <span class="saved-report-badge ${badgeClass} rpt-badge">${escapeHtml(r.flakiness)}</span>
+            <div class="rpt-stat rpt-stat-flakiness ${badgeClass}"><span class="rpt-stat-flakiness-val">${escapeHtml(r.flakiness)}</span></div>
         </div>
     `;
 
