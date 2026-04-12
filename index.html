@@ -372,8 +372,12 @@
 
             <!-- Lab Test Page -->
             <section class="page-section" id="pageLabtest" data-state="idle">
-                <div class="lab-test-warning">
-                    Warning: Experimental — requires Docker
+                <div class="lab-test-topbar">
+                    <div class="lab-test-warning">Experimental feature — requires Docker</div>
+                    <span id="labTestDockerChip" class="lab-docker-chip lab-docker-chip--checking">
+                        <span class="lab-docker-chip-dot"></span>
+                        <span class="lab-docker-chip-label">Checking…</span>
+                    </span>
                 </div>
 
                 <!-- Idle: form -->
@@ -406,8 +410,55 @@
                             </div>
                         </div>
                     </details>
+                    <details class="lab-test-resources" id="labTestStressDetails">
+                        <summary class="lab-test-stress-summary">
+                            Stress factors
+                            <button id="labTestCompleteStress" class="lab-stress-complete-btn" type="button">Complete stress</button>
+                        </summary>
+                        <div class="lab-test-stress-grid">
+                            <div class="lab-test-stress-item">
+                                <label class="lab-stress-checkbox-label">
+                                    <input type="checkbox" id="labTestRandomize">
+                                    Randomize test order
+                                </label>
+                                <span class="lab-test-hint">Surfaces shared-state flakiness (Jest/Nx)</span>
+                            </div>
+                            <div class="lab-test-stress-item">
+                                <label for="labTestTimezone">Timezone</label>
+                                <select id="labTestTimezone">
+                                    <option value="">System default</option>
+                                    <option value="UTC">UTC</option>
+                                    <option value="America/New_York">US East (New York)</option>
+                                    <option value="America/Los_Angeles">US West (Los Angeles)</option>
+                                    <option value="Europe/London">Europe/London</option>
+                                    <option value="Asia/Tokyo">Asia/Tokyo</option>
+                                </select>
+                                <span class="lab-test-hint">Catches date-sensitive non-determinism</span>
+                            </div>
+                            <div class="lab-test-stress-item">
+                                <label for="labTestMaxWorkers">Max workers</label>
+                                <input type="number" id="labTestMaxWorkers" placeholder="auto" min="1" max="32" style="width:70px">
+                                <span class="lab-test-hint">Parallelism pressure (--maxWorkers / --workers)</span>
+                            </div>
+                            <div class="lab-test-stress-item">
+                                <label class="lab-stress-checkbox-label">
+                                    <input type="checkbox" id="labTestUlimitEnabled">
+                                    Low file descriptors
+                                </label>
+                                <input type="number" id="labTestUlimitValue" value="512" min="64" max="4096" style="width:70px">
+                                <span class="lab-test-hint">Surfaces resource leak flakiness</span>
+                            </div>
+                            <div class="lab-test-stress-item">
+                                <label class="lab-stress-checkbox-label">
+                                    <input type="checkbox" id="labTestNetworkLatencyEnabled">
+                                    Network latency
+                                </label>
+                                <input type="number" id="labTestNetworkLatencyMs" value="100" min="10" max="2000" style="width:70px">
+                                <span class="lab-test-hint">ms ±20ms jitter · requires NET_ADMIN</span>
+                            </div>
+                        </div>
+                    </details>
                     <div class="lab-test-meta">
-                        <span id="labTestDockerStatus" class="lab-test-docker-status">Checking Docker…</span>
                         <span id="labTestImage" class="lab-test-image"></span>
                     </div>
                     <div class="lab-test-actions">

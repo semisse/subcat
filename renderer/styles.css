@@ -2742,14 +2742,78 @@
 
 /* ── Lab Test Page ─────────────────────────────────────────────────────────── */
 
+.lab-test-topbar {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
 .lab-test-warning {
     background: color-mix(in srgb, var(--accent-yellow) 15%, transparent);
     border: 1px solid color-mix(in srgb, var(--accent-yellow) 40%, transparent);
     border-radius: 6px;
     color: var(--text-primary);
     font-size: 13px;
-    margin-bottom: 20px;
     padding: 8px 12px;
+}
+
+/* Docker status chip */
+.lab-docker-chip {
+    align-items: center;
+    border: 1px solid;
+    border-radius: 20px;
+    display: inline-flex;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 500;
+    gap: 6px;
+    padding: 5px 11px 5px 8px;
+    transition: background 0.3s, border-color 0.3s, color 0.3s;
+    white-space: nowrap;
+}
+
+.lab-docker-chip-dot {
+    border-radius: 50%;
+    flex-shrink: 0;
+    height: 7px;
+    width: 7px;
+}
+
+/* States */
+.lab-docker-chip--checking {
+    background: rgba(160, 174, 192, 0.1);
+    border-color: rgba(160, 174, 192, 0.25);
+    color: var(--text-secondary);
+}
+.lab-docker-chip--checking .lab-docker-chip-dot {
+    animation: docker-pulse 1.2s ease-in-out infinite;
+    background: var(--text-secondary);
+}
+
+.lab-docker-chip--ok {
+    background: var(--accent-green-dim);
+    border-color: color-mix(in srgb, var(--accent-green) 45%, transparent);
+    color: var(--accent-green);
+}
+.lab-docker-chip--ok .lab-docker-chip-dot {
+    background: var(--accent-green);
+    box-shadow: 0 0 5px var(--accent-green);
+}
+
+.lab-docker-chip--error {
+    background: var(--accent-red-dim);
+    border-color: color-mix(in srgb, var(--accent-red) 45%, transparent);
+    color: var(--accent-red);
+}
+.lab-docker-chip--error .lab-docker-chip-dot {
+    background: var(--accent-red);
+}
+
+@keyframes docker-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
 }
 
 /* State visibility */
@@ -2802,19 +2866,186 @@
     margin-bottom: 14px;
 }
 .lab-test-resources summary {
+    align-items: center;
     color: var(--text-secondary);
     cursor: pointer;
+    display: flex;
     font-size: 12px;
     font-weight: 500;
-    text-transform: uppercase;
+    gap: 10px;
     letter-spacing: 0.04em;
     padding: 4px 0;
+    text-transform: uppercase;
     user-select: none;
+}
+
+.lab-test-stress-summary {
+    justify-content: space-between;
+}
+
+.lab-stress-complete-btn {
+    background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-yellow) 35%, transparent);
+    border-radius: 20px;
+    color: var(--accent-yellow);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin-left: auto;
+    padding: 3px 10px;
+    text-transform: uppercase;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.lab-stress-complete-btn:hover {
+    background: color-mix(in srgb, var(--accent-yellow) 22%, transparent);
+    border-color: color-mix(in srgb, var(--accent-yellow) 55%, transparent);
 }
 .lab-test-resources-row {
     display: flex;
     gap: 24px;
     padding-top: 10px;
+}
+
+/* ── Stress Factors ──────────────────────────────────────────────────────── */
+
+.lab-test-stress-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding-top: 12px;
+}
+
+.lab-test-stress-item {
+    align-items: center;
+    background: color-mix(in srgb, var(--accent-yellow) 5%, var(--bg-tertiary));
+    border: 1px solid color-mix(in srgb, var(--accent-yellow) 18%, transparent);
+    border-radius: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 8px;
+    padding: 10px 12px;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.lab-test-stress-item:hover {
+    background: color-mix(in srgb, var(--accent-yellow) 9%, var(--bg-tertiary));
+    border-color: color-mix(in srgb, var(--accent-yellow) 38%, transparent);
+}
+
+/* Network latency (last item) spans both columns */
+.lab-test-stress-item:last-child {
+    grid-column: 1 / -1;
+}
+
+/* Checkbox + text label */
+.lab-stress-checkbox-label {
+    align-items: center;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* Custom checkbox */
+.lab-stress-checkbox-label input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    border: 1.5px solid color-mix(in srgb, var(--accent-yellow) 45%, transparent);
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 15px;
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+    width: 15px;
+}
+
+.lab-stress-checkbox-label input[type="checkbox"]:checked {
+    background: var(--accent-yellow);
+    border-color: var(--accent-yellow);
+}
+
+.lab-stress-checkbox-label input[type="checkbox"]:checked::after {
+    border: 2px solid #1a1200;
+    border-left: none;
+    border-top: none;
+    content: '';
+    height: 8px;
+    left: 4px;
+    position: absolute;
+    top: 1px;
+    transform: rotate(45deg);
+    width: 4px;
+}
+
+/* Plain label (non-checkbox items: timezone, maxWorkers) */
+.lab-test-stress-item > label:not(.lab-stress-checkbox-label) {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    width: 100%;
+}
+
+/* Number inputs inside stress items */
+.lab-test-stress-item input[type="number"] {
+    background: var(--bg-primary);
+    border: 1px solid color-mix(in srgb, var(--accent-yellow) 22%, transparent);
+    border-radius: 6px;
+    color: var(--text-primary);
+    flex-shrink: 0;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 12px;
+    outline: none;
+    padding: 4px 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 64px;
+}
+
+.lab-test-stress-item input[type="number"]:focus {
+    border-color: var(--accent-yellow);
+    box-shadow: 0 0 0 2px var(--accent-yellow-dim);
+}
+
+/* Select inside stress items */
+.lab-test-stress-item select {
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-primary);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23a0aec0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    border: 1px solid color-mix(in srgb, var(--accent-yellow) 22%, transparent);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex: 1;
+    font-size: 12px;
+    outline: none;
+    padding: 5px 28px 5px 10px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+}
+
+.lab-test-stress-item select:focus {
+    border-color: var(--accent-yellow);
+    box-shadow: 0 0 0 2px var(--accent-yellow-dim);
+}
+
+/* Hint text */
+.lab-test-hint {
+    color: color-mix(in srgb, var(--accent-yellow) 65%, var(--text-muted));
+    font-size: 11px;
+    line-height: 1.4;
+    width: 100%;
 }
 
 .lab-test-meta {

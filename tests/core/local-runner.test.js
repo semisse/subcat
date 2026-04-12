@@ -232,26 +232,29 @@ describe('LocalRunner.start() — shell command selection', () => {
         return calls;
     }
 
+    function getDockerArgs(calls) {
+        return calls.find(([cmd]) => cmd === 'docker')[1];
+    }
+
+    function getShellCmd(calls) {
+        const args = getDockerArgs(calls);
+        return args.at(-1);
+    }
+
     test('Playwright with repeat uses --repeat-each flag', async () => {
         const calls = captureDockerArgs();
         const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 5 });
         runner.on('done', () => {});
         await runner.start();
-
-        const dockerRunCall = calls.find(([cmd]) => cmd === 'docker');
-        const shCmd = dockerRunCall[1].at(-1);
-        expect(shCmd).toBe('npx playwright test --repeat-each=5');
+        expect(getShellCmd(calls)).toBe('npx playwright test --repeat-each=5');
     });
 
-    test('non-Playwright with repeat uses shell loop', async () => {
+    test('non-Playwright with repeat uses shell loop with sentinel', async () => {
         const calls = captureDockerArgs();
         const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 3 });
         runner.on('done', () => {});
         await runner.start();
-
-        const dockerRunCall = calls.find(([cmd]) => cmd === 'docker');
-        const shCmd = dockerRunCall[1].at(-1);
-        expect(shCmd).toBe('for i in $(seq 1 3); do npx nx test myapp; done');
+        expect(getShellCmd(calls)).toBe('for i in $(seq 1 3); do npx nx test myapp; echo __SUBCAT_DONE__; done');
     });
 
     test('non-Playwright with repeat=1 runs command directly', async () => {
@@ -259,10 +262,174 @@ describe('LocalRunner.start() — shell command selection', () => {
         const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1 });
         runner.on('done', () => {});
         await runner.start();
+        expect(getShellCmd(calls)).toBe('npx nx test myapp');
+    });
 
-        const dockerRunCall = calls.find(([cmd]) => cmd === 'docker');
-        const shCmd = dockerRunCall[1].at(-1);
-        expect(shCmd).toBe('npx nx test myapp');
+    // ── Progress sentinel ─────────────────────────────────────────────────────
+
+    test('non-Playwright repeat=1 has no sentinel (single run, no loop)', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1 });
+        runner.on('done', () => {});
+        await runner.start();
+        expect(getShellCmd(calls)).not.toContain('__SUBCAT_DONE__');
+    });
+
+    // ── Stress factors — randomize ─────────────────────────────────────────────
+
+    test('randomize: appends --randomize for Jest/Nx', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, randomize: true });
+        runner.on('done', () => {});
+        await runner.start();
+        expect(getShellCmd(calls)).toBe('npx nx test myapp --randomize');
+    });
+
+    test('randomize: does NOT append --randomize for Playwright', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 1, randomize: true });
+        runner.on('done', () => {});
+        await runner.start();
+        expect(getShellCmd(calls)).not.toContain('--randomize');
+    });
+
+    test('randomize: works with repeat loop for Jest/Nx', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 3, randomize: true });
+        runner.on('done', () => {});
+        await runner.start();
+        expect(getShellCmd(calls)).toBe('for i in $(seq 1 3); do npx nx test myapp --randomize; echo __SUBCAT_DONE__; done');
+    });
+
+    // ── Stress factors — maxWorkers ────────────────────────────────────────────
+
+    test('maxWorkers: appends --maxWorkers=N for Jest/Nx', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, maxWorkers: 1 });
+        runner.on('done', () => {});
+        await runner.start();
+        expect(getShellCmd(calls)).toBe('npx nx test myapp --maxWorkers=1');
+    });
+
+    test('maxWorkers: appends --workers=N for Playwright', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 1, maxWorkers: 2 });
+        runner.on('done', () => {});
+        await runner.start();
+        expect(getShellCmd(calls)).toBe('npx playwright test --workers=2');
+    });
+
+    test('maxWorkers: null leaves command unchanged', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, maxWorkers: null });
+        runner.on('done', () => {});
+        await runner.start();
+        expect(getShellCmd(calls)).toBe('npx nx test myapp');
+    });
+
+    // ── Stress factors — timezone ──────────────────────────────────────────────
+
+    test('timezone: adds -e TZ=... to Docker args', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, timezone: 'America/New_York' });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        const tzIdx = args.indexOf('-e');
+        const tzValues = [];
+        for (let i = 0; i < args.length - 1; i++) {
+            if (args[i] === '-e') tzValues.push(args[i + 1]);
+        }
+        expect(tzValues).toContain('TZ=America/New_York');
+    });
+
+    test('timezone: null does not add TZ env var', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, timezone: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        const envValues = [];
+        for (let i = 0; i < args.length - 1; i++) {
+            if (args[i] === '-e') envValues.push(args[i + 1]);
+        }
+        expect(envValues.some(v => v.startsWith('TZ='))).toBe(false);
+    });
+
+    // ── Stress factors — ulimitNofile ──────────────────────────────────────────
+
+    test('ulimitNofile: adds --ulimit nofile=N:N to Docker args', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, ulimitNofile: 512 });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        const ulimitIdx = args.indexOf('--ulimit');
+        expect(ulimitIdx).toBeGreaterThan(-1);
+        expect(args[ulimitIdx + 1]).toBe('nofile=512:512');
+    });
+
+    test('ulimitNofile: null does not add --ulimit flag', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, ulimitNofile: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        expect(args).not.toContain('--ulimit');
+    });
+
+    // ── Stress factors — networkLatency ────────────────────────────────────────
+
+    test('networkLatency: adds --cap-add NET_ADMIN to Docker args', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, networkLatency: 100 });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        expect(args).toContain('--cap-add');
+        expect(args[args.indexOf('--cap-add') + 1]).toBe('NET_ADMIN');
+    });
+
+    test('networkLatency: prepends tc netem setup to shell command', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, networkLatency: 150 });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        expect(shCmd).toContain('tc qdisc add dev eth0 root netem delay 150ms 20ms');
+        expect(shCmd).toContain('npx nx test myapp');
+    });
+
+    test('networkLatency: null does not add --cap-add or tc setup', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, networkLatency: null });
+        runner.on('done', () => {});
+        await runner.start();
+        const args = getDockerArgs(calls);
+        const shCmd = getShellCmd(calls);
+        expect(args).not.toContain('--cap-add');
+        expect(shCmd).not.toContain('tc qdisc');
+    });
+
+    // ── Stress factors — combinations ──────────────────────────────────────────
+
+    test('randomize + maxWorkers + timezone combined', async () => {
+        const calls = captureDockerArgs();
+        const runner = new LocalRunner({
+            repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 2,
+            randomize: true, maxWorkers: 1, timezone: 'UTC',
+        });
+        runner.on('done', () => {});
+        await runner.start();
+        const shCmd = getShellCmd(calls);
+        const args = getDockerArgs(calls);
+        expect(shCmd).toContain('--randomize');
+        expect(shCmd).toContain('--maxWorkers=1');
+        const envValues = [];
+        for (let i = 0; i < args.length - 1; i++) {
+            if (args[i] === '-e') envValues.push(args[i + 1]);
+        }
+        expect(envValues).toContain('TZ=UTC');
     });
 });
 
@@ -292,6 +459,27 @@ describe('LocalRunner events', () => {
         runner.on('line', (l) => received.push(l));
         runner.on('done', () => {
             expect(received).toEqual(expect.arrayContaining(['line one', 'line two']));
+            done();
+        });
+        runner.start();
+    });
+
+    test('emits "progress" once per iteration via __SUBCAT_DONE__ sentinel', (done) => {
+        const lines = [
+            'Tests: 3 passed, 3 total',  // tool output (should NOT trigger progress)
+            '__SUBCAT_DONE__',            // sentinel (SHOULD trigger)
+            'Tests: 3 passed, 3 total',
+            '__SUBCAT_DONE__',
+        ];
+        mockSpawnImpl = jest.fn(() => makeProcWithOutput(lines));
+
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 2 });
+        const progressEvents = [];
+        runner.on('progress', (p) => progressEvents.push(p));
+        runner.on('done', () => {
+            expect(progressEvents).toHaveLength(2);
+            expect(progressEvents[0]).toEqual({ completed: 1, total: 2 });
+            expect(progressEvents[1]).toEqual({ completed: 2, total: 2 });
             done();
         });
         runner.start();

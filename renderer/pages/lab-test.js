@@ -42,6 +42,35 @@ function initLabTest() {
     document.getElementById('labTestRunBtn')?.addEventListener('click', handleRun);
     document.getElementById('labTestStopBtn')?.addEventListener('click', handleStop);
     document.getElementById('labTestRunAgainBtn')?.addEventListener('click', handleRunAgain);
+    document.getElementById('labTestCompleteStress')?.addEventListener('click', handleCompleteStress);
+}
+
+function handleCompleteStress(e) {
+    e.stopPropagation(); // don't toggle the <details>
+
+    // Ensure the section is open
+    const details = document.getElementById('labTestStressDetails');
+    if (details) details.open = true;
+
+    // Activate all checkboxes
+    const randomize = document.getElementById('labTestRandomize');
+    const ulimit    = document.getElementById('labTestUlimitEnabled');
+    const netLatency = document.getElementById('labTestNetworkLatencyEnabled');
+    if (randomize)   randomize.checked = true;
+    if (ulimit)      ulimit.checked    = true;
+    if (netLatency)  netLatency.checked = true;
+
+    // Set maximum stress values for numeric fields
+    const ulimitVal  = document.getElementById('labTestUlimitValue');
+    const latencyMs  = document.getElementById('labTestNetworkLatencyMs');
+    const maxWorkers = document.getElementById('labTestMaxWorkers');
+    if (ulimitVal)  ulimitVal.value  = '512';
+    if (latencyMs)  latencyMs.value  = '100';
+    if (maxWorkers) maxWorkers.value = '1';
+
+    // Timezone: pick a different timezone to force non-determinism
+    const timezone = document.getElementById('labTestTimezone');
+    if (timezone && !timezone.value) timezone.value = 'America/New_York';
 }
 
 function initLabTestPage() {
@@ -52,20 +81,23 @@ function initLabTestPage() {
 }
 
 async function checkDockerStatus() {
-    const statusEl = document.getElementById('labTestDockerStatus');
-    if (!statusEl) return;
-    statusEl.textContent = 'Checking Docker…';
-    statusEl.className = 'lab-test-docker-status';
+    const chip = document.getElementById('labTestDockerChip');
+    const setChip = (state, label) => {
+        if (!chip) return;
+        chip.className = `lab-docker-chip lab-docker-chip--${state}`;
+        const labelEl = chip.querySelector('.lab-docker-chip-label');
+        if (labelEl) labelEl.textContent = label;
+    };
+
+    setChip('checking', 'Checking…');
 
     const result = await window.api.checkDocker();
     const runBtn = document.getElementById('labTestRunBtn');
     if (result.available) {
-        statusEl.textContent = 'Docker: available';
-        statusEl.classList.add('docker-ok');
+        setChip('ok', 'Docker ready');
         if (runBtn) runBtn.disabled = false;
     } else {
-        statusEl.textContent = 'Docker: not available — install Docker to use this feature';
-        statusEl.classList.add('docker-error');
+        setChip('error', 'Docker not found');
         if (runBtn) runBtn.disabled = true;
     }
 }
@@ -85,6 +117,15 @@ async function handleRun() {
     const cpus       = parseFloat(document.getElementById('labTestCpus')?.value) || 2;
     const memoryGb   = parseFloat(document.getElementById('labTestMemory')?.value) || 7;
 
+    const randomize  = document.getElementById('labTestRandomize')?.checked ?? false;
+    const timezone   = document.getElementById('labTestTimezone')?.value || null;
+    const maxWorkersRaw = document.getElementById('labTestMaxWorkers')?.value;
+    const maxWorkers = maxWorkersRaw ? parseInt(maxWorkersRaw, 10) : null;
+    const ulimitEnabled = document.getElementById('labTestUlimitEnabled')?.checked ?? false;
+    const ulimitNofile  = ulimitEnabled ? (parseInt(document.getElementById('labTestUlimitValue')?.value, 10) || 512) : null;
+    const networkLatencyEnabled = document.getElementById('labTestNetworkLatencyEnabled')?.checked ?? false;
+    const networkLatency = networkLatencyEnabled ? (parseInt(document.getElementById('labTestNetworkLatencyMs')?.value, 10) || 100) : null;
+
     if (!repoPath || !testCmd) return;
 
     outputLines = [];
@@ -95,7 +136,7 @@ async function handleRun() {
     const outputEl = document.getElementById('labTestOutput');
     if (outputEl) outputEl.textContent = '';
 
-    const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb });
+    const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency });
     activeRunId = id;
 }
 

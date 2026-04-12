@@ -4,13 +4,18 @@ const fs = require('fs');
 const path = require('path');
 
 class LocalRunner extends EventEmitter {
-    constructor({ repoPath, testCommand, repeat = 10, cpus = 2, memoryGb = 7 }) {
+    constructor({ repoPath, testCommand, repeat = 10, cpus = 2, memoryGb = 7, randomize = false, timezone = null, maxWorkers = null, ulimitNofile = null, networkLatency = null }) {
         super();
         this.repoPath = repoPath;
         this.testCommand = testCommand;
         this.repeat = repeat;
         this.cpus = cpus;
         this.memoryGb = memoryGb;
+        this.randomize = randomize;
+        this.timezone = timezone;
+        this.maxWorkers = maxWorkers;
+        this.ulimitNofile = ulimitNofile;
+        this.networkLatency = networkLatency;
         this.containerName = `subcat-stress-${Date.now()}`;
         this._process = null;
         this._outputLines = [];
@@ -56,15 +61,36 @@ class LocalRunner extends EventEmitter {
         const image = await LocalRunner.detectImage(this.repoPath);
         this._isPlaywright = LocalRunner.isPlaywright(this.testCommand);
 
+        // Build test command with stress flags
+        let baseCmd = this.testCommand;
+
+        if (this.maxWorkers !== null) {
+            baseCmd += this._isPlaywright
+                ? ` --workers=${this.maxWorkers}`
+                : ` --maxWorkers=${this.maxWorkers}`;
+        }
+
+        if (this.randomize && !this._isPlaywright) {
+            baseCmd += ' --randomize';
+        }
+
+        // Build shell command with repeat logic
         let shellCmd;
         if (this._isPlaywright) {
             shellCmd = this.repeat > 1
-                ? `${this.testCommand} --repeat-each=${this.repeat}`
-                : this.testCommand;
+                ? `${baseCmd} --repeat-each=${this.repeat}`
+                : baseCmd;
         } else {
+            // Inject a sentinel after each iteration so progress tracking is
+            // tool-agnostic (avoids depending on Jest/Vitest/Nx output format).
             shellCmd = this.repeat > 1
-                ? `for i in $(seq 1 ${this.repeat}); do ${this.testCommand}; done`
-                : this.testCommand;
+                ? `for i in $(seq 1 ${this.repeat}); do ${baseCmd}; echo __SUBCAT_DONE__; done`
+                : baseCmd;
+        }
+
+        // Prepend network latency setup (requires --cap-add NET_ADMIN in Docker args)
+        if (this.networkLatency !== null) {
+            shellCmd = `apt-get install -y iproute2 -qq > /dev/null 2>&1; tc qdisc add dev eth0 root netem delay ${this.networkLatency}ms 20ms 2>/dev/null || true; ${shellCmd}`;
         }
 
         const args = [
@@ -75,12 +101,21 @@ class LocalRunner extends EventEmitter {
             `--memory-swap=${this.memoryGb}g`,
             '--shm-size=1g',
             '-e', 'CI=true',
-            '-v', `${this.repoPath}:/app`,
-            '-w', '/app',
-            image,
-            'sh', '-c',
-            shellCmd,
         ];
+
+        if (this.timezone) {
+            args.push('-e', `TZ=${this.timezone}`);
+        }
+
+        if (this.ulimitNofile !== null) {
+            args.push('--ulimit', `nofile=${this.ulimitNofile}:${this.ulimitNofile}`);
+        }
+
+        if (this.networkLatency !== null) {
+            args.push('--cap-add', 'NET_ADMIN');
+        }
+
+        args.push('-v', `${this.repoPath}:/app`, '-w', '/app', image, 'sh', '-c', shellCmd);
 
         this._process = spawn('docker', args);
 
@@ -101,8 +136,9 @@ class LocalRunner extends EventEmitter {
                         this.emit('progress', { completed: completedCount, total: this.repeat });
                     }
                 } else {
-                    // Jest/Vitest/Nx: count completed iterations via summary lines
-                    if (/\bTests:\s/.test(line)) {
+                    // Jest/Vitest/Nx: sentinel injected into the shell loop
+                    // fires once per iteration regardless of tool output format.
+                    if (line.trim() === '__SUBCAT_DONE__') {
                         completedCount++;
                         this.emit('progress', { completed: completedCount, total: this.repeat });
                     }

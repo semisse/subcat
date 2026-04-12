@@ -28,10 +28,10 @@ function register({ db, getWindow }) {
         return result.filePaths[0];
     });
 
-    handle('local-run:start', async (event, { repoPath, testCommand, repeat, cpus, memoryGb }) => {
+    handle('local-run:start', async (event, { repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency }) => {
         const id = db.insertLocalRun({ repoPath, testCommand, cpus, memoryGb, repeat });
 
-        const runner = new LocalRunner({ repoPath, testCommand, repeat, cpus, memoryGb });
+        const runner = new LocalRunner({ repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency });
         activeRunners.set(id, runner);
 
         runner.on('line', (line) => {
