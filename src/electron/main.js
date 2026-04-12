@@ -258,7 +258,12 @@ ipcLocalRunner.register({ db, getWindow });
 // ─── IPC: misc ────────────────────────────────────────────────────────────────
 
 ipcMain.handle('open-external', async (event, url) => {
-    if (url.startsWith('https://github.com/')) shell.openExternal(url);
+    const allowed = [
+        'https://github.com/',
+        'https://subcat.todaywedream.com',
+        'https://todaywedream.com'
+    ];
+    if (allowed.some(prefix => url.startsWith(prefix))) shell.openExternal(url);
 });
 
 ipcMain.handle('reveal-in-finder', (event, filePath) => {

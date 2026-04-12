@@ -57,7 +57,34 @@ function switchPage(page) {
 
     if (page === 'reports') { closeReportViewer(); loadSavedReports(); }
     if (page === 'lab-test') initLabTestPage();
+    if (page === 'profile') loadProfilePage();
 }
+
+async function loadProfilePage() {
+    const [reports, labRuns] = await Promise.all([
+        window.api.getSavedReports(),
+        window.api.getLocalRuns()
+    ]);
+    const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+    set('profileStatReports', Array.isArray(reports) ? reports.length : 0);
+    set('profileStatLabRuns', Array.isArray(labRuns) ? labRuns.length : 0);
+
+    const versionEl = document.getElementById('creditsVersion');
+    if (versionEl && !versionEl.textContent) {
+        const version = await window.api.getVersion();
+        versionEl.textContent = `v${version}`;
+    }
+}
+
+document.querySelectorAll('.credits-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.api.openExternal(link.dataset.url);
+    });
+});
 
 async function loadSavedReports() {
     const list = document.getElementById('savedReportsList');
