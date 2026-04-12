@@ -38,13 +38,13 @@ test('Docker status check completes and updates UI', async ({ electronApp }) => 
 
     await window.locator('.nav-item[data-page="lab-test"]').click();
 
-    // Wait for the async docker check to resolve (replaces "Checking Docker…")
-    const statusEl = window.locator('#labTestDockerStatus');
-    await expect(statusEl).not.toHaveText('Checking Docker…', { timeout: 8000 });
+    // Wait for the docker chip to leave the "checking" state
+    const chip = window.locator('#labTestDockerChip');
+    await expect(chip).not.toHaveClass(/lab-docker-chip--checking/, { timeout: 8000 });
 
-    // Result is either available or not — both are valid on CI
-    const text = await statusEl.textContent();
-    expect(text).toMatch(/Docker:/);
+    // Result is either ok or error — both are valid on CI
+    const cls = await chip.getAttribute('class');
+    expect(cls).toMatch(/lab-docker-chip--(ok|error)/);
 });
 
 test('history section is empty on first load', async ({ electronApp }) => {

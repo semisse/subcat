@@ -1,6 +1,12 @@
 // Simple HTTP mock server for E2E tests.
 // Routes are registered as plain objects keyed by 'METHOD /path/pattern'.
 // Path segments starting with ':' act as wildcards.
+//
+// Response sequencing: pass an array of responses as the fixture value.
+// Each request shifts the next response off the front.  The last element
+// is "sticky" — it keeps being returned for all subsequent requests.
+//   e.g.  'GET /foo': [{ body: { s: 'a' } }, { body: { s: 'b' } }]
+//         1st call → { s: 'a' },  2nd+ calls → { s: 'b' }
 
 const http = require('http');
 
@@ -15,6 +21,12 @@ function matchRoute(fixtures, method, url) {
         const fixSegs = fixturePath.split('/');
         if (fixSegs.length !== reqSegs.length) continue;
         if (fixSegs.every((seg, i) => seg.startsWith(':') || seg === reqSegs[i])) {
+            // Resolve sequences: shift the first element; keep last element sticky.
+            if (Array.isArray(value)) {
+                const response = value[0];
+                if (value.length > 1) value.shift();
+                return response;
+            }
             return value;
         }
     }

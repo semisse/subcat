@@ -33,6 +33,7 @@ const test = base.extend({
                 SUBCAT_API_HOST: '127.0.0.1',
                 SUBCAT_API_PORT: String(mockServer.port),
                 SUBCAT_API_PROTOCOL: 'http',
+                SUBCAT_POLL_INTERVAL_MS: '1000',
                 ...(authToken ? { SUBCAT_E2E_TOKEN: authToken } : {}),
             },
         });
