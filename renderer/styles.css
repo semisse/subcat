@@ -114,6 +114,11 @@
             flex-shrink: 0;
         }
 
+        .lab-test-nav-dot {
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
         .nav-beta-pill {
             margin-left: auto;
             font-size: 9px;
@@ -2940,6 +2945,12 @@
 #pageLabtest[data-state="done"]    .lab-test-form { display: none; }
 #pageLabtest[data-state="done"]    .lab-test-running-header { display: none; }
 
+.lab-test-command-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
 .lab-test-field {
     display: flex;
     flex-direction: column;
@@ -3064,10 +3075,6 @@
     border-color: color-mix(in srgb, var(--accent-yellow) 38%, transparent);
 }
 
-/* Network latency (last item) spans both columns */
-.lab-test-stress-item:last-child {
-    grid-column: 1 / -1;
-}
 
 /* Checkbox + text label */
 .lab-stress-checkbox-label {
@@ -3293,6 +3300,10 @@
     color: var(--text-primary);
     font-size: 14px;
     font-weight: 600;
+}
+.lab-test-done-actions {
+    display: flex;
+    gap: 8px;
 }
 
 .lab-result-badge {

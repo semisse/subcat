@@ -66,6 +66,7 @@ function migrate(db) {
     try { db.exec(`ALTER TABLE runs ADD COLUMN pr_number INTEGER`); } catch (_) { /* column already exists */ }
     try { db.exec(`ALTER TABLE runs ADD COLUMN pr_title TEXT`); } catch (_) { /* column already exists */ }
     try { db.exec(`ALTER TABLE runs ADD COLUMN head_sha TEXT`); } catch (_) { /* column already exists */ }
+    try { db.exec(`ALTER TABLE local_runs ADD COLUMN config TEXT`); } catch (_) { /* column already exists */ }
 
     db.exec(`
         CREATE TABLE IF NOT EXISTS failed_only_attempts (
@@ -129,6 +130,7 @@ function migrate(db) {
             failed INTEGER,
             flaky INTEGER,
             failed_test_names TEXT,
+            config TEXT,
             started_at TEXT NOT NULL DEFAULT (datetime('now')),
             completed_at TEXT
         );
@@ -360,11 +362,11 @@ function getFailedOnlyAttempts({ owner, repo, runId }) {
     ).all(owner, repo, runId).map(r => r.attempt_num);
 }
 
-function insertLocalRun({ repoPath, testCommand, cpus, memoryGb, repeat }) {
+function insertLocalRun({ repoPath, testCommand, cpus, memoryGb, repeat, config }) {
     const result = getDb().prepare(`
-        INSERT INTO local_runs (repo_path, test_command, cpus, memory_gb, repeat_count)
-        VALUES (?, ?, ?, ?, ?)
-    `).run(repoPath, testCommand, cpus, memoryGb, repeat);
+        INSERT INTO local_runs (repo_path, test_command, cpus, memory_gb, repeat_count, config)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `).run(repoPath, testCommand, cpus, memoryGb, repeat, config ? JSON.stringify(config) : null);
     return result.lastInsertRowid;
 }
 

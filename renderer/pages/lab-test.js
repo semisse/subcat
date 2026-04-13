@@ -2,7 +2,15 @@
 // Depends on: utils.js (escapeHtml, flakinessSummary)
 
 let activeRunId = null;
+let lastCompletedRunId = null;
 let outputLines = [];
+
+function setNavRunningDot(show) {
+    const dot = document.getElementById('labTestNavDot');
+    if (!dot) return;
+    dot.style.visibility = show ? 'visible' : 'hidden';
+    dot.className = show ? 'status-dot in_progress lab-test-nav-dot' : 'status-dot lab-test-nav-dot';
+}
 
 function initLabTest() {
     window.api.onLocalRunOutput(({ id, line }) => {
@@ -14,11 +22,23 @@ function initLabTest() {
         if (id !== activeRunId) return;
         const el = document.getElementById('labTestProgress');
         if (el) el.textContent = `Running… ${completed} / ${total}`;
+
+        const barWrap = document.getElementById('labTestProgressBarWrap');
+        const barFill = document.getElementById('labTestProgressBarFill');
+        const barLabel = document.getElementById('labTestProgressBarLabel');
+        if (barWrap) barWrap.style.display = '';
+        if (barFill && total > 0) {
+            const pct = Math.round((completed / total) * 100);
+            barFill.style.width = `${pct}%`;
+            if (barLabel) barLabel.textContent = `${pct}%`;
+        }
     });
 
     window.api.onLocalRunDone(({ id, results }) => {
         if (id !== activeRunId) return;
+        lastCompletedRunId = id;
         activeRunId = null;
+        setNavRunningDot(false);
         renderDoneState(results);
         renderHistory();
     });
@@ -48,6 +68,7 @@ function initLabTest() {
     document.getElementById('labTestStopBtn')?.addEventListener('click', handleStop);
     document.getElementById('labTestRunAgainBtn')?.addEventListener('click', handleRunAgain);
     document.getElementById('labTestCompleteStress')?.addEventListener('click', handleCompleteStress);
+    document.getElementById('labTestSaveReportBtn')?.addEventListener('click', handleSaveReport);
 }
 
 function handleCompleteStress(e) {
@@ -162,20 +183,39 @@ async function handleRun() {
     const outputEl = document.getElementById('labTestOutput');
     if (outputEl) outputEl.textContent = '';
 
+    const barWrap = document.getElementById('labTestProgressBarWrap');
+    const barFill = document.getElementById('labTestProgressBarFill');
+    const barLabel = document.getElementById('labTestProgressBarLabel');
+    if (barWrap) barWrap.style.display = 'none';
+    if (barFill) { barFill.style.width = '0%'; barFill.classList.remove('done', 'has-failures'); }
+    if (barLabel) barLabel.textContent = '0%';
+
     const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand });
     activeRunId = id;
+    setNavRunningDot(true);
 }
 
 async function handleStop() {
     if (activeRunId != null) {
         await window.api.stopLocalRun(activeRunId);
         activeRunId = null;
+        setNavRunningDot(false);
     }
     setPageState('idle');
 }
 
 function handleRunAgain() {
     setPageState('idle');
+}
+
+async function handleSaveReport() {
+    if (!lastCompletedRunId) return;
+    const btn = document.getElementById('labTestSaveReportBtn');
+    const result = await window.api.saveLocalRunReport(lastCompletedRunId);
+    if (result?.saved && btn) {
+        btn.textContent = 'Saved!';
+        setTimeout(() => { btn.textContent = 'Save Report'; }, 2000);
+    }
 }
 
 function appendOutputLine(line) {
@@ -198,6 +238,12 @@ function appendOutputLine(line) {
 
 function renderDoneState(results) {
     setPageState('done');
+
+    const barFill = document.getElementById('labTestProgressBarFill');
+    if (barFill) {
+        barFill.style.width = '100%';
+        barFill.classList.add(results.failed > 0 ? 'has-failures' : 'done');
+    }
 
     if (results.error) {
         document.getElementById('labTestResultSummary').innerHTML =

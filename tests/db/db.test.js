@@ -426,6 +426,19 @@ describe('local_runs', () => {
         const run = db.getLocalRun(id);
         expect(run.status).toBe('running');
     });
+
+    test('insertLocalRun persists config as JSON and getLocalRun returns it', () => {
+        const config = { randomize: true, timezone: 'America/New_York', maxWorkers: 1, networkLatency: 100 };
+        const id = db.insertLocalRun({ ...LOCAL, config });
+        const run = db.getLocalRun(id);
+        expect(JSON.parse(run.config)).toEqual(config);
+    });
+
+    test('insertLocalRun stores null config when not provided', () => {
+        const id = db.insertLocalRun(LOCAL);
+        const run = db.getLocalRun(id);
+        expect(run.config).toBeNull();
+    });
 });
 
 // ─── getLabRuns ──────────────────────────────────────────────────────────────

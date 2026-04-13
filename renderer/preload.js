@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('api', {
     browseEnvFile: () => ipcRenderer.invoke('local-run:browse-env-file'),
     getLocalRuns: () => ipcRenderer.invoke('local-run:list'),
     deleteLocalRun: (id) => ipcRenderer.invoke('local-run:delete', { id }),
+    saveLocalRunReport: (id) => ipcRenderer.invoke('local-run:save-report', { id }),
     onLocalRunOutput: (cb) => ipcRenderer.on('local-run:output', (_, data) => cb(data)),
     onLocalRunProgress: (cb) => ipcRenderer.on('local-run:progress', (_, data) => cb(data)),
     onLocalRunDone: (cb) => ipcRenderer.on('local-run:done', (_, data) => cb(data)),
