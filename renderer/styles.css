@@ -3024,24 +3024,47 @@
 }
 
 
-.lab-stress-complete-btn {
-    background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent-yellow) 35%, transparent);
+.lab-stress-presets {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.lab-stress-preset-btn {
+    background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--text-secondary) 25%, transparent);
     border-radius: 20px;
-    color: var(--accent-yellow);
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.06em;
-    margin-left: auto;
     padding: 3px 10px;
     text-transform: uppercase;
-    transition: background 0.15s, border-color 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.lab-stress-complete-btn:hover {
-    background: color-mix(in srgb, var(--accent-yellow) 22%, transparent);
-    border-color: color-mix(in srgb, var(--accent-yellow) 55%, transparent);
+.lab-stress-preset-btn:hover {
+    background: color-mix(in srgb, var(--text-secondary) 18%, transparent);
+    border-color: color-mix(in srgb, var(--text-secondary) 45%, transparent);
+}
+
+.lab-stress-preset-btn[data-preset="light"].active {
+    background: color-mix(in srgb, var(--accent-green) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent-green) 45%, transparent);
+    color: var(--accent-green);
+}
+
+.lab-stress-preset-btn[data-preset="medium"].active {
+    background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent-yellow) 45%, transparent);
+    color: var(--accent-yellow);
+}
+
+.lab-stress-preset-btn[data-preset="heavy"].active {
+    background: color-mix(in srgb, var(--accent-red) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent-red) 45%, transparent);
+    color: var(--accent-red);
 }
 .lab-test-resources-row {
     display: flex;

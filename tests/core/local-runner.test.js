@@ -92,6 +92,16 @@ describe('LocalRunner.isPlaywright()', () => {
 // ── LocalRunner.detectImage ───────────────────────────────────────────────────
 
 describe('LocalRunner.detectImage()', () => {
+    let origImageExists;
+    beforeEach(() => {
+        origImageExists = LocalRunner._imageExists;
+        // By default, first candidate (exact version -noble) exists
+        LocalRunner._imageExists = jest.fn().mockResolvedValue(true);
+    });
+    afterEach(() => {
+        LocalRunner._imageExists = origImageExists;
+    });
+
     test('returns node:22 when package.json has no @playwright/test', async () => {
         mockFsReadFileImpl = () => JSON.stringify({ devDependencies: {} });
         const img = await LocalRunner.detectImage('/some/repo');
@@ -134,6 +144,38 @@ describe('LocalRunner.detectImage()', () => {
         });
         const img = await LocalRunner.detectImage('/some/repo');
         expect(img).toBe('mcr.microsoft.com/playwright:v1.50.0-noble');
+    });
+
+    test('falls back to major.minor.0-noble when exact version not found', async () => {
+        LocalRunner._imageExists = jest.fn()
+            .mockResolvedValueOnce(false)   // v1.60.1-noble
+            .mockResolvedValueOnce(true);   // v1.60.0-noble
+        mockFsReadFileImpl = () => JSON.stringify({
+            devDependencies: { '@playwright/test': '^1.60.1' },
+        });
+        const img = await LocalRunner.detectImage('/some/repo');
+        expect(img).toBe('mcr.microsoft.com/playwright:v1.60.0-noble');
+    });
+
+    test('falls back to jammy when noble images not found', async () => {
+        LocalRunner._imageExists = jest.fn()
+            .mockResolvedValueOnce(false)   // exact-noble
+            .mockResolvedValueOnce(false)   // major.minor.0-noble
+            .mockResolvedValueOnce(true);   // exact-jammy
+        mockFsReadFileImpl = () => JSON.stringify({
+            devDependencies: { '@playwright/test': '1.40.0' },
+        });
+        const img = await LocalRunner.detectImage('/some/repo');
+        expect(img).toBe('mcr.microsoft.com/playwright:v1.40.0-jammy');
+    });
+
+    test('falls back to node:22 when no playwright image exists', async () => {
+        LocalRunner._imageExists = jest.fn().mockResolvedValue(false);
+        mockFsReadFileImpl = () => JSON.stringify({
+            devDependencies: { '@playwright/test': '1.99.0' },
+        });
+        const img = await LocalRunner.detectImage('/some/repo');
+        expect(img).toBe('node:22');
     });
 });
 
@@ -243,10 +285,10 @@ describe('LocalRunner.start() — shell command selection', () => {
 
     test('Playwright with repeat uses --repeat-each flag', async () => {
         const calls = captureDockerArgs();
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 5 });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 5, installCommand: 'npm install' });
         runner.on('done', () => {});
         await runner.start();
-        expect(getShellCmd(calls)).toBe('npx playwright test --repeat-each=5');
+        expect(getShellCmd(calls)).toBe('npm install && xvfb-run --auto-servernum -- npx playwright test --repeat-each=5');
     });
 
     test('non-Playwright with repeat uses shell loop with sentinel', async () => {
@@ -287,7 +329,7 @@ describe('LocalRunner.start() — shell command selection', () => {
 
     test('randomize: does NOT append --randomize for Playwright', async () => {
         const calls = captureDockerArgs();
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 1, randomize: true });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 1, randomize: true, installCommand: 'npm install' });
         runner.on('done', () => {});
         await runner.start();
         expect(getShellCmd(calls)).not.toContain('--randomize');
@@ -313,10 +355,10 @@ describe('LocalRunner.start() — shell command selection', () => {
 
     test('maxWorkers: appends --workers=N for Playwright', async () => {
         const calls = captureDockerArgs();
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 1, maxWorkers: 2 });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 1, maxWorkers: 2, installCommand: 'npm install' });
         runner.on('done', () => {});
         await runner.start();
-        expect(getShellCmd(calls)).toBe('npx playwright test --workers=2');
+        expect(getShellCmd(calls)).toBe('npm install && xvfb-run --auto-servernum -- npx playwright test --workers=2');
     });
 
     test('maxWorkers: null leaves command unchanged', async () => {
@@ -415,7 +457,7 @@ describe('LocalRunner.start() — shell command selection', () => {
 
     test('cpuStress: prepends stress-ng background command to shell command', async () => {
         const calls = captureDockerArgs();
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, cpuStress: 2 });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx nx test myapp', repeat: 1, cpuStress: 2, cpus: 4 });
         runner.on('done', () => {});
         await runner.start();
         const shCmd = getShellCmd(calls);
@@ -611,7 +653,7 @@ describe('LocalRunner events', () => {
         const lines = ['line one', 'line two', '3 passed'];
         mockSpawnImpl = jest.fn(() => makeProcWithOutput(lines));
 
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test' });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', installCommand: 'npm install' });
         const received = [];
         runner.on('line', (l) => received.push(l));
         runner.on('done', () => {
@@ -645,7 +687,7 @@ describe('LocalRunner events', () => {
     test('emits "done" with parsed results on close', (done) => {
         mockSpawnImpl = jest.fn(() => makeProcWithOutput(['5 passed (10s)', '1 failed']));
 
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test' });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', installCommand: 'npm install' });
         runner.on('done', (results) => {
             expect(results.passed).toBe(5);
             expect(results.failed).toBe(1);
@@ -663,7 +705,7 @@ describe('LocalRunner events', () => {
             return proc;
         });
 
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test' });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', installCommand: 'npm install' });
         runner.on('error', (e) => {
             expect(e.message).toBe('spawn ENOENT');
             done();
@@ -684,7 +726,7 @@ describe('LocalRunner events', () => {
             return makeFakeProcess();
         });
 
-        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test' });
+        const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', installCommand: 'npm install' });
         runner.on('done', () => {});
         await runner.start();
         runner.stop();
@@ -692,5 +734,64 @@ describe('LocalRunner events', () => {
         expect(mockSpawnImpl).toHaveBeenCalledWith(
             'docker', ['kill', runner.containerName], { stdio: 'ignore' }
         );
+    });
+});
+
+describe('LocalRunner.validate()', () => {
+    const base = { repoPath: '/app', testCommand: 'npx playwright test', repeat: 2, cpus: 2, memoryGb: 7, installCommand: 'npm install' };
+
+    it('warns when Playwright has no installCommand', () => {
+        const runner = new LocalRunner({ ...base, installCommand: null });
+        const warnings = runner.validate();
+        expect(warnings.length).toBeGreaterThanOrEqual(1);
+        expect(warnings[0]).toMatch(/install command/i);
+    });
+
+    it('no install warning for non-Playwright', () => {
+        const runner = new LocalRunner({ ...base, testCommand: 'npx jest', installCommand: null });
+        expect(runner.validate()).toHaveLength(0);
+    });
+
+    it('warns when ulimit is too low for Playwright', () => {
+        const runner = new LocalRunner({ ...base, ulimitNofile: 512 });
+        const warnings = runner.validate();
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toMatch(/file descriptor/i);
+    });
+
+    it('accepts ulimit ≥ 1024 for Playwright', () => {
+        const runner = new LocalRunner({ ...base, ulimitNofile: 1024 });
+        expect(runner.validate()).toHaveLength(0);
+    });
+
+    it('allows low ulimit for non-Playwright commands', () => {
+        const runner = new LocalRunner({ ...base, testCommand: 'npx jest', ulimitNofile: 256 });
+        expect(runner.validate()).toHaveLength(0);
+    });
+
+    it('warns when cpuStress >= cpus', () => {
+        const runner = new LocalRunner({ ...base, cpuStress: 2 });
+        const warnings = runner.validate();
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toMatch(/cpu stress/i);
+    });
+
+    it('accepts cpuStress < cpus', () => {
+        const runner = new LocalRunner({ ...base, cpuStress: 1 });
+        expect(runner.validate()).toHaveLength(0);
+    });
+
+    it('returns no warnings with no stress factors', () => {
+        const runner = new LocalRunner({ ...base });
+        expect(runner.validate()).toHaveLength(0);
+    });
+
+    it('start() emits done with error when validation fails', async () => {
+        const runner = new LocalRunner({ ...base, installCommand: null });
+        const done = new Promise(resolve => runner.on('done', resolve));
+        await runner.start();
+        const results = await done;
+        expect(results.error).toMatch(/install command/i);
+        expect(results.passed).toBe(0);
     });
 });

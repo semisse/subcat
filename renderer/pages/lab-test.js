@@ -67,48 +67,71 @@ function initLabTest() {
     document.getElementById('labTestRunBtn')?.addEventListener('click', handleRun);
     document.getElementById('labTestStopBtn')?.addEventListener('click', handleStop);
     document.getElementById('labTestRunAgainBtn')?.addEventListener('click', handleRunAgain);
-    document.getElementById('labTestCompleteStress')?.addEventListener('click', handleCompleteStress);
     document.getElementById('labTestSaveReportBtn')?.addEventListener('click', handleSaveReport);
+
+    document.querySelectorAll('.lab-stress-preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // don't toggle the <details>
+            applyStressPreset(btn.dataset.preset);
+        });
+    });
 }
 
-function handleCompleteStress(e) {
-    e.stopPropagation(); // don't toggle the <details>
+const STRESS_PRESETS = {
+    light: {
+        randomize: true, timezone: 'America/New_York',
+        maxWorkers: null, ulimit: false, ulimitValue: 512,
+        networkLatency: false, networkLatencyMs: 100,
+        cpuStress: false, cpuStressWorkers: 1,
+        packetLoss: false, packetLossPercent: 2,
+        staleRead: false, staleReadMs: 100,
+    },
+    medium: {
+        randomize: true, timezone: 'America/New_York',
+        maxWorkers: '2', ulimit: true, ulimitValue: 1024,
+        networkLatency: true, networkLatencyMs: 50,
+        cpuStress: true, cpuStressWorkers: 1,
+        packetLoss: true, packetLossPercent: 2,
+        staleRead: false, staleReadMs: 100,
+    },
+    heavy: {
+        randomize: true, timezone: 'America/New_York',
+        maxWorkers: '1', ulimit: true, ulimitValue: 512,
+        networkLatency: true, networkLatencyMs: 100,
+        cpuStress: true, cpuStressWorkers: 2,
+        packetLoss: true, packetLossPercent: 5,
+        staleRead: true, staleReadMs: 200,
+    },
+};
 
-    // Ensure the stress factors section is open
+function applyStressPreset(presetName) {
+    const preset = STRESS_PRESETS[presetName];
+    if (!preset) return;
+
     const details = document.getElementById('labTestStressDetails');
     if (details) details.open = true;
 
-    // Activate all checkboxes
-    const randomize  = document.getElementById('labTestRandomize');
-    const ulimit     = document.getElementById('labTestUlimitEnabled');
-    const netLatency = document.getElementById('labTestNetworkLatencyEnabled');
-    const cpuStress  = document.getElementById('labTestCpuStressEnabled');
-    const packetLoss = document.getElementById('labTestPacketLossEnabled');
-    const staleRead  = document.getElementById('labTestStaleReadEnabled');
-    if (randomize)   randomize.checked  = true;
-    if (ulimit)      ulimit.checked     = true;
-    if (netLatency)  netLatency.checked = true;
-    if (cpuStress)   cpuStress.checked  = true;
-    if (packetLoss)  packetLoss.checked = true;
-    if (staleRead)   staleRead.checked  = true;
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    const check = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
 
-    // Set maximum stress values for numeric fields
-    const ulimitVal   = document.getElementById('labTestUlimitValue');
-    const latencyMs   = document.getElementById('labTestNetworkLatencyMs');
-    const maxWorkers  = document.getElementById('labTestMaxWorkers');
-    const cpuWorkers  = document.getElementById('labTestCpuStressWorkers');
-    const lossPercent = document.getElementById('labTestPacketLossPercent');
-    const staleMs     = document.getElementById('labTestStaleReadMs');
-    if (ulimitVal)   ulimitVal.value   = '512';
-    if (latencyMs)   latencyMs.value   = '100';
-    if (maxWorkers)  maxWorkers.value  = '1';
-    if (cpuWorkers)  cpuWorkers.value  = '2';
-    if (lossPercent) lossPercent.value = '5';
-    if (staleMs)     staleMs.value     = '200';
+    check('labTestRandomize', preset.randomize);
+    set('labTestTimezone', preset.timezone);
+    set('labTestMaxWorkers', preset.maxWorkers ?? '');
+    check('labTestUlimitEnabled', preset.ulimit);
+    set('labTestUlimitValue', preset.ulimitValue);
+    check('labTestNetworkLatencyEnabled', preset.networkLatency);
+    set('labTestNetworkLatencyMs', preset.networkLatencyMs);
+    check('labTestCpuStressEnabled', preset.cpuStress);
+    set('labTestCpuStressWorkers', preset.cpuStressWorkers);
+    check('labTestPacketLossEnabled', preset.packetLoss);
+    set('labTestPacketLossPercent', preset.packetLossPercent);
+    check('labTestStaleReadEnabled', preset.staleRead);
+    set('labTestStaleReadMs', preset.staleReadMs);
 
-    // Timezone: pick a different timezone to force non-determinism
-    const timezone = document.getElementById('labTestTimezone');
-    if (timezone && !timezone.value) timezone.value = 'America/New_York';
+    // Highlight active preset button
+    document.querySelectorAll('.lab-stress-preset-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.preset === presetName);
+    });
 }
 
 function initLabTestPage() {

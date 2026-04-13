@@ -40,7 +40,8 @@ if (isMac) {
 
 if (process.env.NODE_ENV === 'development') {
     require('electron-reload')(path.join(__dirname, '../../'), {
-        electron: path.join(__dirname, '../../node_modules', '.bin', 'electron')
+        electron: path.join(__dirname, '../../node_modules', '.bin', 'electron'),
+        ignored: /node_modules|test-results|\.git|[/\\]\./,
     });
 }
 

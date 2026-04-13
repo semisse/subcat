@@ -45,30 +45,89 @@ class LocalRunner extends EventEmitter {
         return /playwright/.test(testCommand);
     }
 
-    static detectImage(repoPath) {
+    static async detectImage(repoPath) {
         try {
             const pkgPath = path.join(repoPath, 'package.json');
             const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
             const deps = { ...pkg.dependencies, ...pkg.devDependencies };
             const raw = deps['@playwright/test'];
-            if (!raw) return Promise.resolve('node:22');
+            if (!raw) return 'node:22';
 
-            // Strip semver range operators and extract X.Y.Z
             const match = raw.replace(/^[^0-9]*/, '').match(/^(\d+\.\d+\.\d+)/);
-            if (!match) return Promise.resolve('node:22');
+            if (!match) return 'node:22';
 
-            return Promise.resolve(`mcr.microsoft.com/playwright:v${match[1]}-noble`);
+            const version = match[1];
+            const [major, minor] = version.split('.');
+
+            // Try exact version first, then major.minor.0, then fallback to node:22
+            const candidates = [
+                `mcr.microsoft.com/playwright:v${version}-noble`,
+                `mcr.microsoft.com/playwright:v${major}.${minor}.0-noble`,
+                `mcr.microsoft.com/playwright:v${version}-jammy`,
+                `mcr.microsoft.com/playwright:v${major}.${minor}.0-jammy`,
+            ];
+
+            for (const image of candidates) {
+                const exists = await LocalRunner._imageExists(image);
+                if (exists) return image;
+            }
+
+            return 'node:22';
         } catch {
-            return Promise.resolve('node:22');
+            return 'node:22';
         }
     }
 
+    static _imageExists(image) {
+        return new Promise((resolve) => {
+            const proc = spawn('docker', ['manifest', 'inspect', image], { stdio: 'ignore' });
+            proc.on('error', () => resolve(false));
+            proc.on('close', (code) => resolve(code === 0));
+        });
+    }
+
+    validate() {
+        const warnings = [];
+
+        // Playwright/Electron tests need npm install inside Docker to get Linux binaries
+        // (the host node_modules contain macOS/Windows binaries that won't run in Linux)
+        if (LocalRunner.isPlaywright(this.testCommand) && !this.installCommand) {
+            warnings.push('Playwright tests need Linux binaries inside Docker. Set an install command (e.g. "npm install") in Advanced configuration so native modules are rebuilt for Linux.');
+        }
+
+        // Electron/Playwright needs many file descriptors (Chromium alone uses 300+)
+        if (this.ulimitNofile !== null && this.ulimitNofile < 1024 && LocalRunner.isPlaywright(this.testCommand)) {
+            warnings.push(`File descriptor limit ${this.ulimitNofile} is too low for Playwright/Electron (needs ≥1024). Tests will crash on startup.`);
+        }
+
+        // CPU stress workers consuming all available CPUs leaves nothing for the tests
+        if (this.cpuStress !== null && this.cpuStress >= this.cpus) {
+            warnings.push(`CPU stress workers (${this.cpuStress}) ≥ container CPUs (${this.cpus}). Tests will have near-zero CPU and timeout.`);
+        }
+
+        // Combined network stress on low-resource containers is almost always fatal
+        const networkFactors = [this.networkLatency, this.packetLoss, this.staleRead].filter(v => v !== null).length;
+        if (networkFactors >= 2 && this.cpuStress !== null && this.cpuStress >= this.cpus) {
+            warnings.push('Multiple network stress factors combined with saturated CPUs — tests are very unlikely to pass.');
+        }
+
+        return warnings;
+    }
+
     async start() {
+        const warnings = this.validate();
+        if (warnings.length) {
+            this.emit('done', { passed: 0, failed: 0, flaky: 0, failedTestNames: [], error: warnings[0] });
+            return;
+        }
+
         const image = await LocalRunner.detectImage(this.repoPath);
         this._isPlaywright = LocalRunner.isPlaywright(this.testCommand);
 
-        // Build test command with stress flags
-        let baseCmd = this.testCommand;
+        // Playwright/Electron needs a virtual display inside Docker (no GPU/screen)
+        let baseCmd = this._isPlaywright
+            ? `xvfb-run --auto-servernum -- ${this.testCommand}`
+            : this.testCommand;
 
         if (this.maxWorkers !== null) {
             baseCmd += this._isPlaywright
