@@ -41,6 +41,8 @@ function updateBreadcrumb(page1, page2, page3) {
 }
 
 function switchPage(page) {
+    const currentActive = document.querySelector('.nav-item.active')?.dataset.page;
+    if (currentActive === page) return;
     if (page !== 'my-prs' && currentView === 'workflow-runs') {
         clearLevel3Poll();
         currentView = 'main';

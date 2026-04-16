@@ -399,9 +399,15 @@ prDetailBack?.addEventListener('click', () => {
 
 workflowRunsBack?.addEventListener('click', () => {
     if (workflowRunsBackTarget === 'runs') {
-        switchPage('runs');
-        updateBreadcrumb('Runs', null);
+        clearLevel3Poll();
         currentView = 'main';
+        // switchPage('runs') would early-return because the nav highlight
+        // was already overridden to 'runs' when we entered this view.
+        // Reset pages manually instead.
+        document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+        document.getElementById('pageRuns')?.classList.add('active');
+        if (workflowRunsNav) workflowRunsNav.style.display = 'none';
+        updateBreadcrumb('Watching', null);
     } else if (workflowRunsBackTarget === 'main') {
         updateBreadcrumb('Dashboard', null);
         showMainView();

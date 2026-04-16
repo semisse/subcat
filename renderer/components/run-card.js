@@ -70,6 +70,7 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
     const runsListPage = getRunsListPage();
     if (runsListPage) {
         const cardClone = card.cloneNode(true);
+        cardClone.id = `run-page-${runId}`;
         cardClone.addEventListener('click', (e) => {
             if (e.target.closest('button')) return;
             const parsed = parseGitHubRunUrl(url);
@@ -113,60 +114,65 @@ function addRunCard(runId, name, status, conclusion, url, repeatTotal = 1, repea
 }
 
 function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTotal, results = []) {
-    const card = document.getElementById(`run-${runId}`);
-    if (!card) return;
+    const cards = [
+        document.getElementById(`run-${runId}`),
+        document.getElementById(`run-page-${runId}`),
+    ].filter(Boolean);
+    if (!cards.length) return;
 
-    card.className = `run-card ${getCardClass(status, conclusion)}`;
-    card.querySelector('.status-dot').className = `status-dot ${status === 'completed' ? conclusion : status}`;
-    card.querySelector('.status-text').textContent = formatStatus(status, conclusion);
+    for (const card of cards) {
+        card.className = `run-card ${getCardClass(status, conclusion)}`;
+        card.querySelector('.status-dot').className = `status-dot ${status === 'completed' ? conclusion : status}`;
+        card.querySelector('.status-text').textContent = formatStatus(status, conclusion);
 
-    if (status === 'completed') {
-        card.dataset.active = 'false';
-        card.querySelector('.cancel-run-btn')?.remove();
-        if (!card.querySelector('.rerun-btn')) {
-            const rerunBtn = document.createElement('button');
-            rerunBtn.className = 'rerun-btn';
-            rerunBtn.textContent = '↩ Rerun';
-            rerunBtn.addEventListener('click', async () => {
-                rerunBtn.disabled = true;
-                rerunBtn.textContent = 'Starting…';
-                const result = await window.api.rerunRun(runId);
-                if (result.error) {
-                    rerunBtn.disabled = false;
-                    rerunBtn.textContent = '↩ Rerun';
-                } else {
-                    rerunBtn.remove();
-                    card.dataset.active = 'true';
-                }
-            });
-            card.querySelector('.run-actions').prepend(rerunBtn);
+        if (status === 'completed') {
+            card.dataset.active = 'false';
+            card.querySelector('.cancel-run-btn')?.remove();
+            if (!card.querySelector('.rerun-btn')) {
+                const rerunBtn = document.createElement('button');
+                rerunBtn.className = 'rerun-btn';
+                rerunBtn.textContent = '↩ Rerun';
+                rerunBtn.addEventListener('click', async () => {
+                    rerunBtn.disabled = true;
+                    rerunBtn.textContent = 'Starting…';
+                    const result = await window.api.rerunRun(runId);
+                    if (result.error) {
+                        rerunBtn.disabled = false;
+                        rerunBtn.textContent = '↩ Rerun';
+                    } else {
+                        rerunBtn.remove();
+                        card.dataset.active = 'true';
+                    }
+                });
+                card.querySelector('.run-actions').prepend(rerunBtn);
+            }
         }
-    }
 
-    if (name) card.querySelector('.run-name').textContent = name;
+        if (name) card.querySelector('.run-name').textContent = name;
 
-    if (repeatTotal > 1) {
-        let repeatEl = card.querySelector('.run-repeat');
-        if (!repeatEl) {
-            repeatEl = document.createElement('span');
-            repeatEl.className = 'run-repeat';
-            card.querySelector('.run-status').appendChild(repeatEl);
-        }
-        const passed = results.filter(r => r === 'success').length;
-        const failed = results.filter(r => r !== 'success').length;
-        const resultsStr = results.length > 0 ? ` · <span class="count-pass">${passed}</span> <span class="count-fail">${failed}</span>` : '';
-        repeatEl.innerHTML = `Run ${repeatCurrent}/${repeatTotal}${resultsStr}`;
+        if (repeatTotal > 1) {
+            let repeatEl = card.querySelector('.run-repeat');
+            if (!repeatEl) {
+                repeatEl = document.createElement('span');
+                repeatEl.className = 'run-repeat';
+                card.querySelector('.run-status').appendChild(repeatEl);
+            }
+            const passed = results.filter(r => r === 'success').length;
+            const failed = results.filter(r => r !== 'success').length;
+            const resultsStr = results.length > 0 ? ` · <span class="count-pass">${passed}</span> <span class="count-fail">${failed}</span>` : '';
+            repeatEl.innerHTML = `Run ${repeatCurrent}/${repeatTotal}${resultsStr}`;
 
-        if (status === 'completed' && repeatCurrent === repeatTotal) {
-            const summary = flakinessSummary(results, repeatTotal);
-            if (summary) {
-                let flakinessEl = card.querySelector('.run-flakiness');
-                if (!flakinessEl) {
-                    flakinessEl = document.createElement('div');
-                    card.appendChild(flakinessEl);
+            if (status === 'completed' && repeatCurrent === repeatTotal) {
+                const summary = flakinessSummary(results, repeatTotal);
+                if (summary) {
+                    let flakinessEl = card.querySelector('.run-flakiness');
+                    if (!flakinessEl) {
+                        flakinessEl = document.createElement('div');
+                        card.appendChild(flakinessEl);
+                    }
+                    flakinessEl.className = `run-flakiness ${summary.cls}`;
+                    flakinessEl.textContent = summary.label;
                 }
-                flakinessEl.className = `run-flakiness ${summary.cls}`;
-                flakinessEl.textContent = summary.label;
             }
         }
     }
