@@ -292,12 +292,6 @@ ipcMain.handle('show-about', () => {
     }
 });
 
-ipcMain.handle('refresh-runs', () => {
-    const sendToWindow = (ch, data) => mainWindow?.webContents.send(ch, data);
-    runs.resumeRuns({ db, poller, getToken, sendToWindow });
-    runs.resumePinnedWorkflows({ db, getToken, sendToWindow });
-});
-
 // ─── IPC: notification center ─────────────────────────────────────────────────
 
 ipcMain.handle('get-notifications', () => db.getNotifications());

@@ -30,7 +30,6 @@ contextBridge.exposeInMainWorld('api', {
 
     getVersion: () => ipcRenderer.invoke('get-version'),
     showAbout: () => ipcRenderer.invoke('show-about'),
-    refreshRuns: () => ipcRenderer.invoke('refresh-runs'),
     authGetStatus: () => ipcRenderer.invoke('auth-get-status'),
     authStartLogin: () => ipcRenderer.invoke('auth-start-login'),
     authLogout: () => ipcRenderer.invoke('auth-logout'),

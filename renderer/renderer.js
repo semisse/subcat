@@ -356,65 +356,6 @@ async function initUser() {
 
 appVersion.addEventListener('click', () => window.api.showAbout());
 
-const refreshBtn = document.getElementById('refreshBtn');
-refreshBtn.addEventListener('click', async () => {
-    refreshBtn.classList.add('spinning');
-    refreshBtn.addEventListener('animationend', () => refreshBtn.classList.remove('spinning'), { once: true });
-
-    if (currentView === 'workflow-runs' && currentWorkflow && currentPRContext) {
-        await openWorkflowRuns(currentWorkflow, currentPRContext, workflowRunsBackTarget);
-        return;
-    }
-
-    if (currentView === 'pr-detail' && currentPR) {
-        await openPRDetail(currentPR);
-        return;
-    }
-
-    const activePage = document.querySelector('.nav-item.active')?.dataset.page;
-
-    if (activePage === 'my-prs') {
-        await loadUserPRs();
-        return;
-    }
-
-    if (activePage === 'reports') {
-        await loadSavedReports();
-        return;
-    }
-
-    if (activePage !== 'home' && activePage !== undefined) {
-        // runs, profile — nothing meaningful to refresh
-        return;
-    }
-
-    // main view refresh (home page)
-    watchedRuns.clear();
-    runsList.style.display = 'none';
-    emptyState.style.display = 'none';
-    loadingText.textContent = 'Refreshing…';
-    loadingState.classList.add('visible');
-    sectionPinnedItems.innerHTML = '';
-    sectionMyPrsItems.innerHTML = '';
-    sectionRunsItems.innerHTML = '';
-    sectionWorkflowsItems.innerHTML = '';
-    updateSectionVisibility();
-    myPrsList.innerHTML = '';
-    loadUserPRs();
-
-    await Promise.all([
-        window.api.refreshRuns(),
-        new Promise(r => setTimeout(r, 1000)),
-    ]);
-
-    // extra tick for run-restored events to be processed
-    await new Promise(r => setTimeout(r, 150));
-
-    loadingState.classList.remove('visible');
-    runsList.style.display = '';
-    if (!hasAnyItems()) emptyState.style.display = 'flex';
-    updateSectionVisibility();
-});
 
 logoutBtn.addEventListener('click', async () => {
     await window.api.authLogout();
