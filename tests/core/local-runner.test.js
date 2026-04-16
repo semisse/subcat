@@ -288,7 +288,7 @@ describe('LocalRunner.start() — shell command selection', () => {
         const runner = new LocalRunner({ repoPath: '/r', testCommand: 'npx playwright test', repeat: 5, installCommand: 'npm install' });
         runner.on('done', () => {});
         await runner.start();
-        expect(getShellCmd(calls)).toBe('npm install && xvfb-run --auto-servernum -- npx playwright test --repeat-each=5');
+        expect(getShellCmd(calls)).toBe('npm install && xvfb-run --auto-servernum -- npx playwright test --repeat-each=5 --max-failures=0');
     });
 
     test('non-Playwright with repeat uses shell loop with sentinel', async () => {

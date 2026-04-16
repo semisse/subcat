@@ -1,4 +1,4 @@
-const { ipcMain, dialog } = require('electron');
+const { ipcMain, dialog, Notification } = require('electron');
 const fs = require('fs');
 const LocalRunner = require('../../core/local-runner');
 
@@ -11,16 +11,48 @@ function handle(channel, handler) {
     }
 }
 
+function buildLabTestNotification({ results, repeat, status, error }) {
+    if (error) {
+        return { title: '❌ Lab Test failed', body: error, conclusion: 'failure' };
+    }
+    const { passed = 0, failed = 0, flaky = 0 } = results || {};
+    const ok = status === 'completed' && failed === 0;
+    const parts = [`${repeat} run${repeat === 1 ? '' : 's'}`];
+    if (passed) parts.push(`${passed} passed`);
+    if (failed) parts.push(`${failed} failed`);
+    if (flaky) parts.push(`${flaky} flaky`);
+    return {
+        title: ok ? '✅ Lab Test passed' : '❌ Lab Test failed',
+        body: parts.join(' · '),
+        conclusion: ok ? 'success' : 'failure',
+    };
+}
+
 function register({ db, getWindow }) {
+    function notifyLabTestDone(payload) {
+        const { title, body, conclusion } = buildLabTestNotification(payload);
+        if (Notification.isSupported()) new Notification({ title, body }).show();
+        if (!db) return;
+        const runName = 'Lab Test';
+        const record = db.addNotification({ title, body, url: null, conclusion, runName });
+        const unread = db.getUnreadNotificationCount();
+        getWindow()?.webContents.send('notification-added', {
+            id: record.lastInsertRowid,
+            title,
+            body,
+            url: null,
+            conclusion,
+            run_name: runName,
+            triggered_at: new Date().toISOString(),
+            read: 0,
+            unreadCount: unread,
+        });
+    }
+
     const activeRunners = new Map();
 
     handle('local-run:check-docker', async () => {
         return LocalRunner.checkDocker();
-    });
-
-    handle('local-run:detect-image', async (event, { repoPath }) => {
-        const image = await LocalRunner.detectImage(repoPath);
-        return { image };
     });
 
     handle('local-run:browse-folder', async () => {
@@ -39,11 +71,11 @@ function register({ db, getWindow }) {
         return result.filePaths[0];
     });
 
-    handle('local-run:start', async (event, { repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand }) => {
-        const config = { randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand };
+    handle('local-run:start', async (event, { repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform }) => {
+        const config = { randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform };
         const id = db.insertLocalRun({ repoPath, testCommand, cpus, memoryGb, repeat, config });
 
-        const runner = new LocalRunner({ repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand });
+        const runner = new LocalRunner({ repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform });
         activeRunners.set(id, runner);
 
         runner.on('line', (line) => {
@@ -67,6 +99,7 @@ function register({ db, getWindow }) {
             });
             activeRunners.delete(id);
             getWindow()?.webContents.send('local-run:done', { id, results: { ...results, repeat } });
+            notifyLabTestDone({ results, repeat, status });
         });
 
         runner.on('error', (err) => {
@@ -76,6 +109,7 @@ function register({ db, getWindow }) {
             });
             activeRunners.delete(id);
             getWindow()?.webContents.send('local-run:done', { id, results: { error: err.message } });
+            notifyLabTestDone({ results: null, repeat, status: 'failed', error: err.message });
         });
 
         runner.start();

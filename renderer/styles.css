@@ -2838,6 +2838,22 @@
 
 /* ── Lab Test Page ─────────────────────────────────────────────────────────── */
 
+.lab-test-dots::after {
+    content: '';
+    display: inline-block;
+    width: 1ch;
+    text-align: left;
+    animation: lab-test-dots 1.2s steps(1, end) infinite;
+}
+
+@keyframes lab-test-dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+    100% { content: ''; }
+}
+
 .lab-test-topbar {
     align-items: center;
     display: flex;
@@ -2916,9 +2932,77 @@
 #pageLabtest[data-state="idle"]    .lab-test-running,
 #pageLabtest[data-state="idle"]    .lab-test-done    { display: none; }
 #pageLabtest[data-state="running"] .lab-test-form,
+#pageLabtest[data-state="running"] .lab-test-docker-check,
 #pageLabtest[data-state="running"] .lab-test-done    { display: none; }
-#pageLabtest[data-state="done"]    .lab-test-form { display: none; }
+#pageLabtest[data-state="done"]    .lab-test-form,
+#pageLabtest[data-state="done"]    .lab-test-docker-check { display: none; }
 #pageLabtest[data-state="done"]    .lab-test-running-header { display: none; }
+
+/* Docker-detection gate: hide form until Docker is confirmed */
+#pageLabtest[data-docker="checking"] .lab-test-form,
+#pageLabtest[data-docker="error"]    .lab-test-form { display: none; }
+#pageLabtest[data-docker="ok"]       .lab-test-docker-check { display: none; }
+
+.lab-test-docker-check {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 520px;
+    padding: 24px;
+}
+.lab-test-docker-check__panel {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 420px;
+    text-align: center;
+}
+#pageLabtest[data-docker="checking"] .lab-test-docker-check__panel--checking,
+#pageLabtest[data-docker="error"]    .lab-test-docker-check__panel--error {
+    display: flex;
+}
+.lab-test-docker-check h3 {
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+.lab-test-docker-check p {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+}
+.lab-test-docker-spinner {
+    border: 2px solid color-mix(in srgb, var(--text-secondary) 25%, transparent);
+    border-top-color: var(--text-secondary);
+    border-radius: 50%;
+    height: 32px;
+    width: 32px;
+    animation: docker-spin 0.9s linear infinite;
+    margin-bottom: 4px;
+}
+@keyframes docker-spin {
+    to { transform: rotate(360deg); }
+}
+.lab-test-docker-check__icon {
+    align-items: center;
+    background: var(--accent-red-dim);
+    border: 1px solid color-mix(in srgb, var(--accent-red) 45%, transparent);
+    border-radius: 50%;
+    color: var(--accent-red);
+    display: flex;
+    font-size: 20px;
+    font-weight: 700;
+    height: 40px;
+    justify-content: center;
+    margin-bottom: 4px;
+    width: 40px;
+}
+.lab-test-docker-check__panel--error button {
+    margin-top: 8px;
+}
 
 .lab-test-command-row {
     display: flex;
@@ -3183,26 +3267,12 @@
     width: 100%;
 }
 
-.lab-test-meta {
-    align-items: center;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    margin-bottom: 16px;
-}
 .lab-test-docker-status {
     font-size: 12px;
     color: var(--text-secondary);
 }
 .lab-test-docker-status.docker-ok    { color: var(--accent-green); }
 .lab-test-docker-status.docker-error { color: var(--accent-red); }
-.lab-test-image {
-    color: var(--text-secondary);
-    font-family: 'SF Mono', 'Menlo', monospace;
-    font-size: 12px;
-}
-
 /* Lab test buttons */
 #pageLabtest button.btn-primary,
 #pageLabtest button.btn-secondary,
@@ -3286,6 +3356,31 @@
 }
 .lab-test-output .output-pass { color: var(--accent-green); }
 .lab-test-output .output-fail { color: var(--accent-red); }
+
+.lab-test-output-wrap {
+    position: relative;
+}
+
+.lab-test-output-copy {
+    background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    transition: background 0.15s, color 0.15s;
+    z-index: 1;
+}
+
+.lab-test-output-copy:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
 
 /* Done state */
 .lab-test-done-header {

@@ -367,13 +367,28 @@
             </section>
 
             <!-- Lab Test Page -->
-            <section class="page-section" id="pageLabtest" data-state="idle">
+            <section class="page-section" id="pageLabtest" data-state="idle" data-docker="checking">
                 <div class="lab-test-topbar">
-                    <div class="lab-test-warning">Experimental feature — requires Docker</div>
+                    <div class="lab-test-warning">Experimental feature</div>
                     <span id="labTestDockerChip" class="lab-docker-chip lab-docker-chip--checking">
                         <span class="lab-docker-chip-dot"></span>
                         <span class="lab-docker-chip-label">Checking…</span>
                     </span>
+                </div>
+
+                <!-- Docker detection: loading / error (replaces form until Docker is ready) -->
+                <div class="lab-test-docker-check" id="labTestDockerCheck">
+                    <div class="lab-test-docker-check__panel lab-test-docker-check__panel--checking">
+                        <div class="lab-test-docker-spinner"></div>
+                        <h3>Checking Docker…</h3>
+                        <p>Lab Test runs your suite inside a Docker container. Hang on while we make sure Docker is up.</p>
+                    </div>
+                    <div class="lab-test-docker-check__panel lab-test-docker-check__panel--error">
+                        <div class="lab-test-docker-check__icon">!</div>
+                        <h3>Docker is not running</h3>
+                        <p>Lab Test needs Docker Desktop installed and running. Start Docker and retry.</p>
+                        <button id="labTestDockerRetry" class="btn-secondary">Retry</button>
+                    </div>
                 </div>
 
                 <!-- Idle: form -->
@@ -394,9 +409,6 @@
                             <label for="labTestRepeat">Repeat</label>
                             <input type="number" id="labTestRepeat" value="10" min="1" max="100" style="width:80px">
                         </div>
-                    </div>
-                    <div class="lab-test-meta">
-                        <span id="labTestImage" class="lab-test-image"></span>
                     </div>
                     <details class="lab-test-resources" id="labTestStressDetails">
                         <summary class="lab-test-stress-summary">
@@ -494,6 +506,13 @@
                             <input type="text" id="labTestInstallCommand" placeholder="npm install · npm ci · yarn install" spellcheck="false">
                             <span class="lab-test-hint">Runs inside the container before tests · rebuilds native binaries for Linux</span>
                         </div>
+                        <div class="lab-test-field">
+                            <label class="lab-stress-checkbox-label">
+                                <input type="checkbox" id="labTestForceAmd64">
+                                Force <code>linux/amd64</code> platform
+                            </label>
+                            <span class="lab-test-hint">Enable on Apple Silicon when tests require Google Chrome (not available for arm64) · slower due to emulation</span>
+                        </div>
                         <div class="lab-test-resources-row">
                             <div class="lab-test-field">
                                 <label for="labTestCpus">CPU cores</label>
@@ -522,7 +541,10 @@
                         </div>
                         <span class="lab-run-progress-label" id="labTestProgressBarLabel">0%</span>
                     </div>
-                    <pre class="lab-test-output" id="labTestOutput"></pre>
+                    <div class="lab-test-output-wrap">
+                        <button id="labTestCopyOutputBtn" class="lab-test-output-copy" type="button" title="Copy output">Copy</button>
+                        <pre class="lab-test-output" id="labTestOutput"></pre>
+                    </div>
                 </div>
 
                 <!-- Done: results -->

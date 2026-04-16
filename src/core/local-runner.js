@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 class LocalRunner extends EventEmitter {
-    constructor({ repoPath, testCommand, repeat = 10, cpus = 2, memoryGb = 7, randomize = false, timezone = null, maxWorkers = null, ulimitNofile = null, networkLatency = null, cpuStress = null, packetLoss = null, staleRead = null, envFile = null, envTarget = null, installCommand = null }) {
+    constructor({ repoPath, testCommand, repeat = 10, cpus = 2, memoryGb = 7, randomize = false, timezone = null, maxWorkers = null, ulimitNofile = null, networkLatency = null, cpuStress = null, packetLoss = null, staleRead = null, envFile = null, envTarget = null, installCommand = null, platform = null }) {
         super();
         this.repoPath = repoPath;
         this.testCommand = testCommand;
@@ -22,6 +22,7 @@ class LocalRunner extends EventEmitter {
         this.envFile = envFile;
         this.envTarget = envTarget;
         this.installCommand = installCommand;
+        this.platform = platform;
         this.containerName = `subcat-stress-${Date.now()}`;
         this._process = null;
         this._outputLines = [];
@@ -117,7 +118,12 @@ class LocalRunner extends EventEmitter {
     async start() {
         const warnings = this.validate();
         if (warnings.length) {
-            this.emit('done', { passed: 0, failed: 0, flaky: 0, failedTestNames: [], error: warnings[0] });
+            // Emit asynchronously so the IPC handler can return { id } to the
+            // renderer before this event fires — otherwise activeRunId is still
+            // null on the renderer side and the done event is ignored.
+            setImmediate(() => {
+                this.emit('done', { passed: 0, failed: 0, flaky: 0, failedTestNames: [], error: warnings[0] });
+            });
             return;
         }
 
@@ -143,7 +149,7 @@ class LocalRunner extends EventEmitter {
         let shellCmd;
         if (this._isPlaywright) {
             shellCmd = this.repeat > 1
-                ? `${baseCmd} --repeat-each=${this.repeat}`
+                ? `${baseCmd} --repeat-each=${this.repeat} --max-failures=0`
                 : baseCmd;
         } else {
             // Inject a sentinel after each iteration so progress tracking is
@@ -199,6 +205,7 @@ class LocalRunner extends EventEmitter {
 
         const args = [
             'run', '--rm',
+            ...(this.platform ? ['--platform', this.platform] : []),
             `--name=${this.containerName}`,
             `--cpus=${this.cpus}`,
             `--memory=${this.memoryGb}g`,
@@ -231,6 +238,8 @@ class LocalRunner extends EventEmitter {
             }
         }
 
+        args.push('--add-host', 'host.docker.internal:host-gateway');
+        args.push('--add-host', 'host-localhost:host-gateway');
         args.push('-v', `${this.repoPath}:/app`, '-w', '/app', image, 'sh', '-c', shellCmd);
 
         // Quote args that contain spaces/special chars for display purposes

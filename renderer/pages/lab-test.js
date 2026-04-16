@@ -21,7 +21,7 @@ function initLabTest() {
     window.api.onLocalRunProgress(({ id, completed, total }) => {
         if (id !== activeRunId) return;
         const el = document.getElementById('labTestProgress');
-        if (el) el.textContent = `Running… ${completed} / ${total}`;
+        if (el) el.innerHTML = `Running<span class="lab-test-dots"></span> ${completed} / ${total}`;
 
         const barWrap = document.getElementById('labTestProgressBarWrap');
         const barFill = document.getElementById('labTestProgressBarFill');
@@ -44,18 +44,10 @@ function initLabTest() {
     });
 
     const repoInput = document.getElementById('labTestRepoPath');
-    if (repoInput) {
-        repoInput.addEventListener('input', debounce(() => {
-            const val = repoInput.value.trim();
-            if (val) refreshImageDetection(val);
-        }, 400));
-    }
-
     document.getElementById('labTestBrowse')?.addEventListener('click', async () => {
         const folder = await window.api.browseFolder();
         if (folder) {
             document.getElementById('labTestRepoPath').value = folder;
-            refreshImageDetection(folder);
         }
     });
 
@@ -68,16 +60,30 @@ function initLabTest() {
     document.getElementById('labTestStopBtn')?.addEventListener('click', handleStop);
     document.getElementById('labTestRunAgainBtn')?.addEventListener('click', handleRunAgain);
     document.getElementById('labTestSaveReportBtn')?.addEventListener('click', handleSaveReport);
+    document.getElementById('labTestCopyOutputBtn')?.addEventListener('click', handleCopyOutput);
+    document.getElementById('labTestDockerRetry')?.addEventListener('click', checkDockerStatus);
 
     document.querySelectorAll('.lab-stress-preset-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation(); // don't toggle the <details>
-            applyStressPreset(btn.dataset.preset);
+            if (btn.classList.contains('active')) {
+                applyStressPreset('none');
+            } else {
+                applyStressPreset(btn.dataset.preset);
+            }
         });
     });
 }
 
 const STRESS_PRESETS = {
+    none: {
+        randomize: false, timezone: '',
+        maxWorkers: '', ulimit: false, ulimitValue: 512,
+        networkLatency: false, networkLatencyMs: 100,
+        cpuStress: false, cpuStressWorkers: 1,
+        packetLoss: false, packetLossPercent: 2,
+        staleRead: false, staleReadMs: 100,
+    },
     light: {
         randomize: true, timezone: 'America/New_York',
         maxWorkers: null, ulimit: false, ulimitValue: 512,
@@ -136,13 +142,12 @@ function applyStressPreset(presetName) {
 
 function initLabTestPage() {
     checkDockerStatus();
-    const repoPath = document.getElementById('labTestRepoPath')?.value.trim();
-    if (repoPath) refreshImageDetection(repoPath);
     renderHistory();
 }
 
 async function checkDockerStatus() {
     const chip = document.getElementById('labTestDockerChip');
+    const page = document.getElementById('pageLabtest');
     const setChip = (state, label) => {
         if (!chip) return;
         chip.className = `lab-docker-chip lab-docker-chip--${state}`;
@@ -151,24 +156,19 @@ async function checkDockerStatus() {
     };
 
     setChip('checking', 'Checking…');
+    if (page) page.dataset.docker = 'checking';
 
     const result = await window.api.checkDocker();
     const runBtn = document.getElementById('labTestRunBtn');
     if (result.available) {
         setChip('ok', 'Docker ready');
+        if (page) page.dataset.docker = 'ok';
         if (runBtn) runBtn.disabled = false;
     } else {
         setChip('error', 'Docker not found');
+        if (page) page.dataset.docker = 'error';
         if (runBtn) runBtn.disabled = true;
     }
-}
-
-async function refreshImageDetection(repoPath) {
-    const imageEl = document.getElementById('labTestImage');
-    if (!imageEl) return;
-    imageEl.textContent = 'Detecting…';
-    const { image } = await window.api.detectLabImage(repoPath);
-    imageEl.textContent = `Image: ${image}`;
 }
 
 async function handleRun() {
@@ -194,6 +194,7 @@ async function handleRun() {
     const staleRead = staleReadEnabled ? (parseInt(document.getElementById('labTestStaleReadMs')?.value, 10) || 200) : null;
     const envFile = document.getElementById('labTestEnvFile')?.value.trim() || null;
     const envTarget = document.getElementById('labTestEnvTarget')?.value.trim() || null;
+    const platform = document.getElementById('labTestForceAmd64')?.checked ? 'linux/amd64' : null;
     const installCommand = document.getElementById('labTestInstallCommand')?.value.trim() || null;
 
     if (!repoPath || !testCmd) return;
@@ -201,7 +202,7 @@ async function handleRun() {
     outputLines = [];
     setPageState('running');
     const progressEl = document.getElementById('labTestProgress');
-    if (progressEl) progressEl.textContent = `Running… 0 / ${repeat}`;
+    if (progressEl) progressEl.innerHTML = `Running<span class="lab-test-dots"></span> 0 / ${repeat}`;
 
     const outputEl = document.getElementById('labTestOutput');
     if (outputEl) outputEl.textContent = '';
@@ -213,7 +214,7 @@ async function handleRun() {
     if (barFill) { barFill.style.width = '0%'; barFill.classList.remove('done', 'has-failures'); }
     if (barLabel) barLabel.textContent = '0%';
 
-    const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand });
+    const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform });
     activeRunId = id;
     setNavRunningDot(true);
 }
@@ -229,6 +230,22 @@ async function handleStop() {
 
 function handleRunAgain() {
     setPageState('idle');
+}
+
+async function handleCopyOutput() {
+    const btn = document.getElementById('labTestCopyOutputBtn');
+    const text = outputLines.join('\n');
+    if (!text) return;
+    try {
+        await navigator.clipboard.writeText(text);
+        if (btn) {
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = original; }, 1500);
+        }
+    } catch {
+        // clipboard API unavailable — no-op
+    }
 }
 
 async function handleSaveReport() {
@@ -262,15 +279,24 @@ function appendOutputLine(line) {
 function renderDoneState(results) {
     setPageState('done');
 
+    const infraFailure = (results.passed + results.failed + results.flaky) === 0 && !results.error;
+
     const barFill = document.getElementById('labTestProgressBarFill');
     if (barFill) {
         barFill.style.width = '100%';
-        barFill.classList.add(results.failed > 0 ? 'has-failures' : 'done');
+        barFill.classList.add((results.failed > 0 || infraFailure) ? 'has-failures' : 'done');
     }
 
     if (results.error) {
         document.getElementById('labTestResultSummary').innerHTML =
             `<span class="lab-result-error">Error: ${escapeHtml(results.error)}</span>`;
+        return;
+    }
+
+    if (infraFailure) {
+        const exitInfo = results.exitCode != null ? ` (exit code ${results.exitCode})` : '';
+        document.getElementById('labTestResultSummary').innerHTML =
+            `<span class="lab-result-error">No tests executed${escapeHtml(exitInfo)} — likely a setup failure (install, env vars, target path, or container crash). Check the output log.</span>`;
         return;
     }
 
@@ -351,7 +377,8 @@ async function renderHistory() {
             const f = perRun(run.failed);
             const total = p + f;
             let label, cls;
-            if (f === 0) { label = 'Stable'; cls = 'stable'; }
+            if (total === 0) { label = 'No tests'; cls = 'failed'; }
+            else if (f === 0) { label = 'Stable'; cls = 'stable'; }
             else if (f < total / 2) { label = 'Probably flaky'; cls = 'probably-flaky'; }
             else { label = 'Flaky'; cls = 'flaky'; }
             badge = `<span class="lab-history-badge ${cls}">${label}</span>`;
@@ -392,9 +419,4 @@ async function renderHistory() {
             renderHistory();
         });
     });
-}
-
-function debounce(fn, ms) {
-    let t;
-    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
