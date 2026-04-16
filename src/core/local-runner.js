@@ -48,16 +48,30 @@ class LocalRunner extends EventEmitter {
 
     static async detectImage(repoPath) {
         try {
-            const pkgPath = path.join(repoPath, 'package.json');
-            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-            const raw = deps['@playwright/test'];
-            if (!raw) return 'node:22';
+            // Prefer the resolved version in node_modules over the semver spec in
+            // package.json. A caret range like "^1.52.0" can resolve to 1.59.1,
+            // and the Docker image must match the installed browsers exactly or
+            // Playwright can't find the headless_shell binary.
+            let version = null;
+            try {
+                const installedPath = path.join(repoPath, 'node_modules', '@playwright', 'test', 'package.json');
+                const installed = JSON.parse(fs.readFileSync(installedPath, 'utf8'));
+                const m = String(installed.version || '').match(/^(\d+\.\d+\.\d+)/);
+                if (m) version = m[1];
+            } catch { /* fall through to package.json */ }
 
-            const match = raw.replace(/^[^0-9]*/, '').match(/^(\d+\.\d+\.\d+)/);
-            if (!match) return 'node:22';
+            if (!version) {
+                const pkgPath = path.join(repoPath, 'package.json');
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+                const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+                const raw = deps['@playwright/test'];
+                if (!raw) return 'node:22';
 
-            const version = match[1];
+                const match = raw.replace(/^[^0-9]*/, '').match(/^(\d+\.\d+\.\d+)/);
+                if (!match) return 'node:22';
+                version = match[1];
+            }
+
             const [major, minor] = version.split('.');
 
             // Try exact version first, then major.minor.0, then fallback to node:22

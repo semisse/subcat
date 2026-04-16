@@ -122,6 +122,29 @@ describe('LocalRunner.detectImage()', () => {
         expect(img).toBe('mcr.microsoft.com/playwright:v1.52.0-noble');
     });
 
+    test('prefers resolved version from node_modules over package.json semver spec', async () => {
+        // Simulates "^1.52.0" in package.json but actually installed 1.59.1
+        mockFsReadFileImpl = (p) => {
+            if (String(p).includes('node_modules/@playwright/test/package.json')) {
+                return JSON.stringify({ version: '1.59.1' });
+            }
+            return JSON.stringify({ devDependencies: { '@playwright/test': '^1.52.0' } });
+        };
+        const img = await LocalRunner.detectImage('/some/repo');
+        expect(img).toBe('mcr.microsoft.com/playwright:v1.59.1-noble');
+    });
+
+    test('falls back to package.json semver when node_modules is missing', async () => {
+        mockFsReadFileImpl = (p) => {
+            if (String(p).includes('node_modules/@playwright/test/package.json')) {
+                throw new Error('ENOENT');
+            }
+            return JSON.stringify({ devDependencies: { '@playwright/test': '^1.52.0' } });
+        };
+        const img = await LocalRunner.detectImage('/some/repo');
+        expect(img).toBe('mcr.microsoft.com/playwright:v1.52.0-noble');
+    });
+
     test('returns mcr playwright image when @playwright/test found in dependencies', async () => {
         mockFsReadFileImpl = () => JSON.stringify({
             dependencies: { '@playwright/test': '1.48.2' },
