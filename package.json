@@ -1,6 +1,6 @@
 {
   "name": "subcat",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Get notified when a GitHub Actions CI run finishes",
   "author": "Samuel Fialho",
   "main": "src/electron/main.js",
