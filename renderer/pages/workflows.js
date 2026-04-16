@@ -206,7 +206,7 @@ async function openWorkflowRuns(workflow, { owner, repo, headRef } = {}, backTar
     showWorkflowRunsView(navPage);
 
     if (isRunsSource) {
-        updateBreadcrumb('Runs', workflow.name);
+        updateBreadcrumb('Watching', workflow.name);
     } else {
         updateBreadcrumb('My PRs', prLabel, workflow.name);
     }

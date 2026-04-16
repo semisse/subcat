@@ -2,7 +2,7 @@
 const pageTitles = {
     'home': 'Dashboard',
     'my-prs': 'My PRs',
-    'runs': 'Runs',
+    'runs': 'Watching',
     'reports': 'Reports',
     'lab-test': 'Lab Test',
     'profile': 'Profile'
