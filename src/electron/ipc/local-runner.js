@@ -11,6 +11,85 @@ function handle(channel, handler) {
     }
 }
 
+// Paths flow into `docker -v src:dest:opts` args. A `:` in any of the three
+// volume fields would let docker reinterpret tokens (e.g. mount arbitrary host
+// paths or inject read/write flags). Also reject `..` in envTarget to prevent
+// the resolved container path from escaping /app.
+function validateStartInput(payload) {
+    if (!payload || typeof payload !== 'object') return 'Invalid request payload.';
+    const { repoPath, testCommand, envFile, envTarget, repeat, cpus, memoryGb,
+        maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead,
+        platform, installCommand, timezone } = payload;
+
+    if (typeof repoPath !== 'string' || !repoPath.trim()) return 'Repository path is required.';
+    if (typeof testCommand !== 'string' || !testCommand.trim()) return 'Test command is required.';
+
+    const unsafePathChars = /[:,;\n\r]/;
+    if (unsafePathChars.test(repoPath)) return 'Repository path contains invalid characters.';
+    if (typeof envFile === 'string' && envFile && unsafePathChars.test(envFile)) {
+        return 'Env file path contains invalid characters.';
+    }
+    if (typeof envTarget === 'string' && envTarget) {
+        if (unsafePathChars.test(envTarget)) return 'Env target contains invalid characters.';
+        if (envTarget.split('/').some(seg => seg === '..')) return 'Env target cannot traverse parent directories.';
+    }
+
+    // testCommand and installCommand are concatenated into a `sh -c` string
+    // inside the container. Newlines would break the `for i in $(seq ...); do
+    // CMD; done` loop that drives repeat runs, and a null byte would truncate
+    // the command silently. The __SUBCAT_DONE__ sentinel is injected between
+    // iterations; if the user's command prints it, progress tracking breaks.
+    const unsafeCmdChars = /[\n\r\0]/;
+    const SENTINEL = '__SUBCAT_DONE__';
+    if (unsafeCmdChars.test(testCommand)) return 'Test command contains invalid characters.';
+    if (testCommand.includes(SENTINEL)) return 'Test command cannot contain the reserved sentinel.';
+    if (testCommand.length > 4096) return 'Test command is too long.';
+
+    if (installCommand != null) {
+        if (typeof installCommand !== 'string') return 'Install command must be a string.';
+        if (installCommand) {
+            if (unsafeCmdChars.test(installCommand)) return 'Install command contains invalid characters.';
+            if (installCommand.includes(SENTINEL)) return 'Install command cannot contain the reserved sentinel.';
+            if (installCommand.length > 4096) return 'Install command is too long.';
+        }
+    }
+
+    // Timezone becomes `-e TZ=<value>` on the docker CLI. It's an array arg so
+    // shell metacharacters can't escape, but bad values still produce confusing
+    // container errors. IANA tz names are [A-Za-z0-9_/+-] with a reasonable cap.
+    if (timezone != null && timezone !== '') {
+        if (typeof timezone !== 'string') return 'Timezone must be a string.';
+        if (!/^[A-Za-z0-9_/+-]{1,64}$/.test(timezone)) return 'Timezone contains invalid characters.';
+    }
+
+    const intBound = (v, name, min, max) => {
+        if (v == null) return null;
+        if (!Number.isInteger(v) || v < min || v > max) return `${name} must be an integer between ${min} and ${max}.`;
+        return null;
+    };
+    const numBound = (v, name, min, max) => {
+        if (v == null) return null;
+        if (!Number.isFinite(v) || v < min || v > max) return `${name} must be between ${min} and ${max}.`;
+        return null;
+    };
+
+    const bounds = [
+        intBound(repeat, 'Repeat', 1, 1000),
+        numBound(cpus, 'CPUs', 0.1, 128),
+        numBound(memoryGb, 'Memory (GB)', 0.25, 2048),
+        intBound(maxWorkers, 'Max workers', 1, 256),
+        intBound(ulimitNofile, 'ulimit nofile', 256, 1048576),
+        intBound(networkLatency, 'Network latency (ms)', 0, 60000),
+        intBound(cpuStress, 'CPU stress workers', 1, 256),
+        intBound(packetLoss, 'Packet loss %', 0, 100),
+        intBound(staleRead, 'Stale read (ms)', 0, 60000),
+    ].find(Boolean);
+    if (bounds) return bounds;
+
+    if (platform != null && platform !== 'linux/amd64') return 'Invalid platform.';
+    return null;
+}
+
 function buildLabTestNotification({ results, repeat, status, error }) {
     if (error) {
         return { title: '❌ Lab Test failed', body: error, conclusion: 'failure' };
@@ -50,6 +129,10 @@ function register({ db, getWindow }) {
     }
 
     const activeRunners = new Map();
+    // Runs explicitly cancelled by the user. The runner still emits `done`/
+    // `error` after docker kill, but we must not override the 'cancelled' DB
+    // status nor fire a "Lab Test failed" notification for a user-requested stop.
+    const cancelledRuns = new Set();
 
     handle('local-run:check-docker', async () => {
         return LocalRunner.checkDocker();
@@ -71,7 +154,10 @@ function register({ db, getWindow }) {
         return result.filePaths[0];
     });
 
-    handle('local-run:start', async (event, { repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform }) => {
+    handle('local-run:start', async (event, payload) => {
+        const validationError = validateStartInput(payload);
+        if (validationError) return { error: validationError };
+        const { repoPath, testCommand, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform } = payload;
         const config = { randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform };
         const id = db.insertLocalRun({ repoPath, testCommand, cpus, memoryGb, repeat, config });
 
@@ -87,6 +173,11 @@ function register({ db, getWindow }) {
         });
 
         runner.on('done', (results) => {
+            if (cancelledRuns.has(id)) {
+                cancelledRuns.delete(id);
+                activeRunners.delete(id);
+                return;
+            }
             const hasResults = results.passed > 0 || results.failed > 0 || results.flaky > 0;
             const status = results.exitCode === 0 || hasResults ? 'completed' : 'failed';
             db.updateLocalRun(id, {
@@ -103,6 +194,11 @@ function register({ db, getWindow }) {
         });
 
         runner.on('error', (err) => {
+            if (cancelledRuns.has(id)) {
+                cancelledRuns.delete(id);
+                activeRunners.delete(id);
+                return;
+            }
             db.updateLocalRun(id, {
                 status: 'failed',
                 completedAt: new Date().toISOString(),
@@ -112,19 +208,14 @@ function register({ db, getWindow }) {
             notifyLabTestDone({ results: null, repeat, status: 'failed', error: err.message });
         });
 
-        runner.start();
-        // Emit docker command after returning id so renderer has activeRunId set
-        setImmediate(() => {
-            if (runner._dockerCmd) {
-                getWindow()?.webContents.send('local-run:output', { id, line: runner._dockerCmd });
-            }
-        });
+        runner.start().catch(err => runner.emit('error', err));
         return { id };
     });
 
     handle('local-run:stop', async (event, { id }) => {
         const runner = activeRunners.get(id);
         if (runner) {
+            cancelledRuns.add(id);
             runner.stop();
             activeRunners.delete(id);
         }
@@ -220,4 +311,4 @@ function register({ db, getWindow }) {
     });
 }
 
-module.exports = { register };
+module.exports = { register, validateStartInput };
