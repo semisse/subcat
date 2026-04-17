@@ -1,4 +1,8 @@
-const https = require('https');
+const SUBCAT_API_HOST = process.env.SUBCAT_API_HOST || 'api.github.com';
+const SUBCAT_API_PORT = process.env.SUBCAT_API_PORT ? parseInt(process.env.SUBCAT_API_PORT, 10) : undefined;
+const SUBCAT_API_PROTOCOL = process.env.SUBCAT_API_PROTOCOL || 'https';
+const https = require('https'); // used by postForm (always real github.com)
+const transport = require(SUBCAT_API_PROTOCOL);
 
 const CLIENT_ID = 'Ov23lixvphyDMyJW3UUm';
 
@@ -30,8 +34,9 @@ function postForm(hostname, urlPath, params) {
 
 function fetchUser(token) {
     return new Promise((resolve, reject) => {
-        const req = https.request({
-            hostname: 'api.github.com',
+        const req = transport.request({
+            hostname: SUBCAT_API_HOST,
+            ...(SUBCAT_API_PORT && { port: SUBCAT_API_PORT }),
             path: '/user',
             method: 'GET',
             headers: {

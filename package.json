@@ -1,6 +1,6 @@
 {
   "name": "subcat",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Get notified when a GitHub Actions CI run finishes",
   "author": "Samuel Fialho",
   "main": "src/electron/main.js",
@@ -9,6 +9,7 @@
     "dev": "NODE_ENV=development electron .",
     "test": "NODE_NO_WARNINGS=1 jest",
     "test:coverage": "NODE_NO_WARNINGS=1 jest --coverage",
+    "test:e2e": "playwright test --config=tests/e2e/playwright.config.js",
     "lint": "eslint src/ renderer/",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac --config.mac.target=dmg",
@@ -74,6 +75,10 @@
     "testMatch": [
       "**/tests/**/*.test.js"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/e2e/"
+    ],
     "testEnvironmentOptions": {
       "nodeOptions": "--no-warnings"
     },
@@ -89,6 +94,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.59.1",
     "electron": "^35.0.0",
     "electron-builder": "^26.8.1",
     "electron-reload": "^2.0.0-alpha.1",

@@ -66,6 +66,7 @@ function migrate(db) {
     try { db.exec(`ALTER TABLE runs ADD COLUMN pr_number INTEGER`); } catch (_) { /* column already exists */ }
     try { db.exec(`ALTER TABLE runs ADD COLUMN pr_title TEXT`); } catch (_) { /* column already exists */ }
     try { db.exec(`ALTER TABLE runs ADD COLUMN head_sha TEXT`); } catch (_) { /* column already exists */ }
+    try { db.exec(`ALTER TABLE local_runs ADD COLUMN config TEXT`); } catch (_) { /* column already exists */ }
 
     db.exec(`
         CREATE TABLE IF NOT EXISTS failed_only_attempts (
@@ -113,6 +114,25 @@ function migrate(db) {
             run_name TEXT NOT NULL,
             triggered_at TEXT NOT NULL,
             read INTEGER NOT NULL DEFAULT 0
+        );
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS local_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            repo_path TEXT NOT NULL,
+            test_command TEXT NOT NULL,
+            cpus REAL NOT NULL DEFAULT 2,
+            memory_gb REAL NOT NULL DEFAULT 7,
+            repeat_count INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            passed INTEGER,
+            failed INTEGER,
+            flaky INTEGER,
+            failed_test_names TEXT,
+            config TEXT,
+            started_at TEXT NOT NULL DEFAULT (datetime('now')),
+            completed_at TEXT
         );
     `);
 }
@@ -342,4 +362,38 @@ function getFailedOnlyAttempts({ owner, repo, runId }) {
     ).all(owner, repo, runId).map(r => r.attempt_num);
 }
 
-module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, saveFailedOnlyAttempt, getFailedOnlyAttempts, getPRStats, addSavedReport, getAllSavedReports, deleteSavedReport, getLabRuns, getRunResultById, addNotification, getNotifications, getUnreadNotificationCount, markAllNotificationsRead, clearNotifications };
+function insertLocalRun({ repoPath, testCommand, cpus, memoryGb, repeat, config }) {
+    const result = getDb().prepare(`
+        INSERT INTO local_runs (repo_path, test_command, cpus, memory_gb, repeat_count, config)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `).run(repoPath, testCommand, cpus, memoryGb, repeat, config ? JSON.stringify(config) : null);
+    return result.lastInsertRowid;
+}
+
+function updateLocalRun(id, { status, passed, failed, flaky, failedTestNames, completedAt } = {}) {
+    const fields = [];
+    const values = [];
+    if (status !== undefined)          { fields.push('status = ?');             values.push(status); }
+    if (passed !== undefined)          { fields.push('passed = ?');             values.push(passed); }
+    if (failed !== undefined)          { fields.push('failed = ?');             values.push(failed); }
+    if (flaky !== undefined)           { fields.push('flaky = ?');              values.push(flaky); }
+    if (failedTestNames !== undefined) { fields.push('failed_test_names = ?'); values.push(JSON.stringify(failedTestNames)); }
+    if (completedAt !== undefined)     { fields.push('completed_at = ?');       values.push(completedAt); }
+    if (!fields.length) return;
+    values.push(id);
+    getDb().prepare(`UPDATE local_runs SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+function getLocalRuns(limit = 50) {
+    return getDb().prepare(`SELECT * FROM local_runs ORDER BY started_at DESC LIMIT ?`).all(limit);
+}
+
+function getLocalRun(id) {
+    return getDb().prepare(`SELECT * FROM local_runs WHERE id = ?`).get(id) ?? null;
+}
+
+function deleteLocalRun(id) {
+    getDb().prepare(`DELETE FROM local_runs WHERE id = ?`).run(id);
+}
+
+module.exports = { getDb, addRun, updateRun, addRunResult, getActiveRuns, getAllRuns, getRun, getRunResults, removeRun, clearRunResults, getReport, addPinnedWorkflow, updatePinnedWorkflow, getPinnedWorkflow, getAllPinnedWorkflows, removePinnedWorkflow, savePendingRerun, getPendingRerun, deletePendingRerun, saveFailedOnlyAttempt, getFailedOnlyAttempts, getPRStats, addSavedReport, getAllSavedReports, deleteSavedReport, getLabRuns, getRunResultById, addNotification, getNotifications, getUnreadNotificationCount, markAllNotificationsRead, clearNotifications, insertLocalRun, updateLocalRun, getLocalRuns, getLocalRun, deleteLocalRun };

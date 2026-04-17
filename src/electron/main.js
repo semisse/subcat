@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, dialog } = require('electron');
 
-app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication');
+app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication,AutofillAddressProfileSavePrompt');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -15,8 +15,14 @@ const ipcAuth = require('./ipc/auth');
 const ipcRuns = require('./ipc/runs');
 const ipcReports = require('./ipc/reports');
 const ipcFlags = require('./ipc/flags');
+const ipcLocalRunner = require('./ipc/local-runner');
 
 app.setName('SubCat');
+
+if (process.env.SUBCAT_E2E) {
+    const os = require('os');
+    app.setPath('userData', require('fs').mkdtempSync(path.join(os.tmpdir(), 'subcat-e2e-')));
+}
 
 const isMac = process.platform === 'darwin';
 
@@ -26,7 +32,7 @@ if (isMac) {
         applicationVersion: app.getVersion(),
         copyright: '© Samuel Fialho',
         tagline: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
-        credits: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.',
+        credits: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.\n\nSupport SubCat:\n♥ github.com/sponsors/semisse\n☕ ko-fi.com/semisse\n☕ buymeacoffee.com/semisse',
         website: 'https://github.com/semisse/subcat',
         iconPath: path.join(__dirname, '../../assets', 'Icon-iOS-Default-1024x1024@1x.png'),
     });
@@ -34,7 +40,8 @@ if (isMac) {
 
 if (process.env.NODE_ENV === 'development') {
     require('electron-reload')(path.join(__dirname, '../../'), {
-        electron: path.join(__dirname, '../../node_modules', '.bin', 'electron')
+        electron: path.join(__dirname, '../../node_modules', '.bin', 'electron'),
+        ignored: /node_modules|test-results|\.git|[/\\]\./,
     });
 }
 
@@ -164,7 +171,7 @@ function buildMenu() {
             label: 'View',
             submenu: [
                 { role: 'reload' },
-                { role: 'toggleDevTools' },
+                ...(process.env.NODE_ENV === 'development' ? [{ role: 'toggleDevTools' }] : []),
                 { type: 'separator' },
                 { role: 'resetZoom' },
                 { role: 'zoomIn' },
@@ -192,24 +199,42 @@ app.on('window-all-closed', () => {
 
 // ─── Auto-update ──────────────────────────────────────────────────────────────
 
-if (process.env.NODE_ENV !== 'development') {
+if (process.env.NODE_ENV !== 'development' && !process.env.SUBCAT_E2E) {
     autoUpdater.checkForUpdates();
 
-    autoUpdater.on('update-downloaded', () => {
-        const dialogParent = mainWindow ?? undefined;
-        dialog.showMessageBox(dialogParent, {
-            type: 'info',
-            buttons: ['Restart', 'Later'],
-            defaultId: 0,
-            cancelId: 1,
-            title: 'Update ready',
-            message: 'A new version of SubCat has been downloaded.',
-            detail: 'Restart the app to apply the update.',
-        }).then(({ response }) => {
-            if (response === 0) autoUpdater.quitAndInstall();
+    autoUpdater.on('update-available', (info) => {
+        const record = db.addNotification({
+            title: `Update available: v${info.version}`,
+            body: 'Downloading in the background…',
+            url: null,
+            conclusion: 'update',
+            runName: '',
+        });
+        const unread = db.getUnreadNotificationCount();
+        getWindow()?.webContents.send('notification-added', {
+            id: record.lastInsertRowid,
+            title: `Update available: v${info.version}`,
+            body: 'Downloading in the background…',
+            url: null,
+            conclusion: 'update',
+            triggered_at: new Date().toISOString(),
+            read: 0,
+            unreadCount: unread,
         });
     });
+
+    autoUpdater.on('download-progress', (progress) => {
+        getWindow()?.webContents.send('update-download-progress', {
+            percent: Math.round(progress.percent),
+        });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        getWindow()?.webContents.send('update-ready', { version: info.version });
+    });
 }
+
+ipcMain.handle('install-update', () => autoUpdater.quitAndInstall());
 
 app.on('activate', () => {
     if (mainWindow) {
@@ -227,13 +252,21 @@ app.on('activate', () => {
 
 ipcAuth.register({ auth, storage, getWindow, getLoginWindow, setCurrentUser: u => { currentUser = u; }, createMainWindow, createLoginWindow });
 ipcRuns.register({ db, poller, storage, getWindow, getUser: () => currentUser });
-ipcReports.register({ db, getWindow });
+ipcReports.register({ db, getWindow, getToken: () => storage.loadToken() || undefined });
 ipcFlags.register();
+ipcLocalRunner.register({ db, getWindow });
 
 // ─── IPC: misc ────────────────────────────────────────────────────────────────
 
 ipcMain.handle('open-external', async (event, url) => {
-    if (url.startsWith('https://github.com/')) shell.openExternal(url);
+    const allowed = [
+        'https://github.com/',
+        'https://subcat.todaywedream.com',
+        'https://todaywedream.com',
+        'https://ko-fi.com/semisse',
+        'https://buymeacoffee.com/semisse',
+    ];
+    if (allowed.some(prefix => url.startsWith(prefix))) shell.openExternal(url);
 });
 
 ipcMain.handle('reveal-in-finder', (event, filePath) => {
@@ -252,17 +285,11 @@ ipcMain.handle('show-about', () => {
             type: 'info',
             title: 'About SubCat',
             message: `SubCat ${app.getVersion()}`,
-            detail: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.\n\n© Samuel Fialho\nhttps://github.com/semisse/subcat',
+            detail: 'Stop babysitting your PRs. SubCat watches GitHub Actions runs and investigates flaky tests — so you don\'t have to.\n\n© Samuel Fialho\nhttps://github.com/semisse/subcat\n\nSupport SubCat:\n♥ github.com/sponsors/semisse\n☕ ko-fi.com/semisse\n☕ buymeacoffee.com/semisse',
             buttons: ['OK'],
             defaultId: 0
         });
     }
-});
-
-ipcMain.handle('refresh-runs', () => {
-    const sendToWindow = (ch, data) => mainWindow?.webContents.send(ch, data);
-    runs.resumeRuns({ db, poller, getToken, sendToWindow });
-    runs.resumePinnedWorkflows({ db, getToken, sendToWindow });
 });
 
 // ─── IPC: notification center ─────────────────────────────────────────────────

@@ -50,6 +50,7 @@ function register({ db, poller, storage, getWindow, getUser }) {
     });
 
     handle('confirm-dialog', async (event, { title, message }) => {
+        if (process.env.SUBCAT_E2E) return true;
         const { response } = await dialog.showMessageBox(getWindow(), {
             type: 'warning',
             buttons: ['Stop & Remove', 'Cancel'],

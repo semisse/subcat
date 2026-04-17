@@ -21,6 +21,7 @@ function ensureDir(filePath) {
 }
 
 function storeToken(token) {
+    if (process.env.SUBCAT_E2E_TOKEN) return;
     if (USE_FALLBACK) {
         const tokenFile = getTokenFile();
         ensureDir(tokenFile);
@@ -33,6 +34,7 @@ function storeToken(token) {
 }
 
 function loadToken() {
+    if (process.env.SUBCAT_E2E_TOKEN) return process.env.SUBCAT_E2E_TOKEN;
     try {
         const tokenFile = getTokenFile();
         if (!fs.existsSync(tokenFile)) return null;
@@ -48,6 +50,7 @@ function loadToken() {
 }
 
 function clearToken() {
+    if (process.env.SUBCAT_E2E_TOKEN) return;
     try { fs.unlinkSync(getTokenFile()); } catch (_) { /* file may not exist */ }
 }
 

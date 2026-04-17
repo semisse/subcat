@@ -30,7 +30,6 @@ contextBridge.exposeInMainWorld('api', {
 
     getVersion: () => ipcRenderer.invoke('get-version'),
     showAbout: () => ipcRenderer.invoke('show-about'),
-    refreshRuns: () => ipcRenderer.invoke('refresh-runs'),
     authGetStatus: () => ipcRenderer.invoke('auth-get-status'),
     authStartLogin: () => ipcRenderer.invoke('auth-start-login'),
     authLogout: () => ipcRenderer.invoke('auth-logout'),
@@ -45,6 +44,7 @@ contextBridge.exposeInMainWorld('api', {
     getSavedReports: () => ipcRenderer.invoke('get-saved-reports'),
     deleteSavedReport: (id) => ipcRenderer.invoke('delete-saved-report', id),
     revealInFinder: (filePath) => ipcRenderer.invoke('reveal-in-finder', filePath),
+    readReportFile: (filePath) => ipcRenderer.invoke('read-report-file', filePath),
     getLabRuns: () => ipcRenderer.invoke('get-lab-runs'),
     getRunResult: (id) => ipcRenderer.invoke('get-run-result', id),
     getRunResultsForRun: (runId) => ipcRenderer.invoke('get-run-results-for-run', runId),
@@ -56,4 +56,20 @@ contextBridge.exposeInMainWorld('api', {
     markNotificationsRead: () => ipcRenderer.invoke('mark-notifications-read'),
     clearNotifications: () => ipcRenderer.invoke('clear-notifications'),
     onNotificationAdded: (cb) => ipcRenderer.on('notification-added', (_, data) => cb(data)),
+    onUpdateDownloadProgress: (cb) => ipcRenderer.on('update-download-progress', (_, data) => cb(data)),
+    onUpdateReady: (cb) => ipcRenderer.on('update-ready', (_, data) => cb(data)),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+
+    // Lab Test
+    startLocalRun: (opts) => ipcRenderer.invoke('local-run:start', opts),
+    stopLocalRun: (id) => ipcRenderer.invoke('local-run:stop', { id }),
+    checkDocker: () => ipcRenderer.invoke('local-run:check-docker'),
+    browseFolder: () => ipcRenderer.invoke('local-run:browse-folder'),
+    browseEnvFile: () => ipcRenderer.invoke('local-run:browse-env-file'),
+    getLocalRuns: () => ipcRenderer.invoke('local-run:list'),
+    deleteLocalRun: (id) => ipcRenderer.invoke('local-run:delete', { id }),
+    saveLocalRunReport: (id) => ipcRenderer.invoke('local-run:save-report', { id }),
+    onLocalRunOutput: (cb) => ipcRenderer.on('local-run:output', (_, data) => cb(data)),
+    onLocalRunProgress: (cb) => ipcRenderer.on('local-run:progress', (_, data) => cb(data)),
+    onLocalRunDone: (cb) => ipcRenderer.on('local-run:done', (_, data) => cb(data)),
 });

@@ -1,7 +1,9 @@
 const { EventEmitter } = require('events');
 const { fetchRunStatus, fetchFailedTests, rerunWorkflow, delay, githubGet } = require('./github');
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = process.env.SUBCAT_POLL_INTERVAL_MS
+    ? parseInt(process.env.SUBCAT_POLL_INTERVAL_MS, 10)
+    : 15_000;
 const TRANSIENT_ERRORS = new Set(['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED']);
 const isTransient = err => TRANSIENT_ERRORS.has(err.code) || err.status === 429;
 
