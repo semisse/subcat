@@ -1,8 +1,10 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const { fetchRunArtifacts } = require('../../core/github');
-
-const FLAKINESS_THRESHOLD_PCT = 2;
+// Single source of truth for the flakiness threshold. renderer/utils.js exports
+// the same constant for use in the UI; both must agree or the badge the user
+// sees in the app will disagree with the badge on exported reports.
+const { FLAKINESS_THRESHOLD_PCT } = require('../../../renderer/utils');
 
 const ROOT_CAUSE_KEYWORDS = {
     Timing: ['timeout', 'timed out', 'element not found', 'not visible', 'wait'],
