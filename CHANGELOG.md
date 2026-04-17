@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.1] — 2026-04-17
+
+### Fixed
+- **Auto-update on macOS** — v1.2.0 shipped only a DMG, but electron-updater needs a `.zip` to swap the app in place. Existing users saw `ZIP file not provided` silently in the logs and no update prompt. The mac build now produces both a signed DMG (for first install) and a signed ZIP (for in-place updates); `latest-mac.yml` points at the ZIP.
+
 ## [1.2.0] — 2026-04-17
 
 ### Added
