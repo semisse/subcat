@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.3] — 2026-04-17
+
+### Fixed
+- **Run-card action buttons unreadable in Watching list** — the Rerun, Rerun Failed Only, and Report buttons inherited the 28x28 icon sizing from `.run-actions button`, clipping their labels and causing them to overlap each other in the card header. Added an override so text-labelled actions render as compact pills with proper padding and auto width.
+
 ## [1.2.2] — 2026-04-17
 
 ### Fixed
