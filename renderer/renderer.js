@@ -154,7 +154,7 @@ async function openReportViewer(r) {
 
     document.getElementById('reportsListView').style.display = 'none';
     document.getElementById('reportViewer').style.display = '';
-    updateBreadcrumb('Reports', escapeHtml(r.title));
+    updateBreadcrumb('Reports', r.title);
 
     const titleEl = document.getElementById('reportViewerTitle');
     if (titleEl) titleEl.textContent = r.title;
@@ -354,10 +354,9 @@ async function initUser() {
     }
 }
 
-appVersion.addEventListener('click', () => window.api.showAbout());
+appVersion?.addEventListener('click', () => window.api.showAbout());
 
-
-logoutBtn.addEventListener('click', async () => {
+logoutBtn?.addEventListener('click', async () => {
     await window.api.authLogout();
 });
 
