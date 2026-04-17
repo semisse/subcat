@@ -13,6 +13,7 @@
 - **Lab Test: native notification** — when a run finishes, a desktop notification fires with the pass/fail summary, and the notification is logged in the notification center.
 - **Lab Test: copy output** — one click copies the full run log for bug reports.
 - **Lab Test: Force `linux/amd64`** — Apple Silicon option for tests that need Google Chrome (not available on arm64).
+- **Lab Test: docker command in output** — the exact `docker run` invocation is emitted as the first log line so it can be copied for reproduction or bug reports.
 - **Report drill-down viewer** — click a saved report to see failed-test grouping, flakiness badges, artifacts, and root-cause hints.
 - **Profile page** — GitHub profile, credits balance, usage stats, and donation links.
 - **Dashboard stat tooltips** — hover any stat card to see what the metric means and how it's calculated.
@@ -30,12 +31,20 @@
 ### Fixed
 - Empty states for the Watching and My PRs sections after nav border shift.
 - Run cards now update consistently in both the Dashboard and Watching pages (previously only the dashboard clone was refreshed).
+- Run-restored flow now wires Report, Rerun, and Rerun Failed buttons onto both card copies (previously only the dashboard card got them after a restart).
+- Rerun button no longer appears on intermediate iterations of a repeat run — only on the final iteration.
 - Back button from a workflow-runs drill-down returns to Watching correctly — `switchPage` early-return was swallowing the navigation.
-- Lab Test: validation failures no longer deadlock the UI — `done` event now fires after the IPC handler returns the run id.
+- Lab Test: validation failures no longer deadlock the UI — `done` event now fires after the IPC handler returns the run id, and the renderer surfaces the error message instead of hanging on the loading screen.
+- Lab Test: zero-valued stress inputs (0 ms latency, 0 % packet loss, 0 ms stale read) are now preserved instead of silently falling back to the default.
+- Report viewer breadcrumb no longer renders HTML entities literally — `updateBreadcrumb` already escapes its segments.
+- Renderer no longer throws on the login screen when `appVersion` / `logoutBtn` aren't in the DOM.
 - Release pipeline uses a PAT to push tags so `release.yml` triggers correctly.
 
+### Security
+- **Lab Test: IPC input validation** — `local-run:start` now rejects payloads before they reach `docker` or `sh -c`. Paths with `:`, `,`, `;`, or newlines are blocked (docker `-v` injection), `envTarget` traversal (`..`) is rejected, `testCommand` / `installCommand` reject newlines, null bytes, the `__SUBCAT_DONE__` progress sentinel, and commands longer than 4 096 chars, and `timezone` must match the IANA character set.
+
 ### Testing
-- 351 unit tests + 44 E2E specs passing.
+- 370 unit tests + 44 E2E specs passing.
 - E2E infrastructure: mock server with response sequencing, fixture factories, 1s poll interval via `SUBCAT_POLL_INTERVAL_MS`.
 - `confirm-dialog` auto-confirms in E2E mode (`SUBCAT_E2E`).
 
