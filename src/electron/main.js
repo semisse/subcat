@@ -94,7 +94,18 @@ function createMainWindow() {
         resizable: true,
         ...windowPrefs  // titleBarStyle: 'hiddenInset' applied on macOS via windowPrefs
     });
-    mainWindow.loadFile(path.join(__dirname, '../../index.html'));
+    const newRenderer = process.env.SUBCAT_NEW_RENDERER === '1';
+    if (newRenderer) {
+        if (process.env.NODE_ENV === 'development') {
+            mainWindow.loadURL('http://localhost:5173');
+        }
+        else {
+            mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
+        }
+    }
+    else {
+        mainWindow.loadFile(path.join(__dirname, '../../index.html'));
+    }
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 

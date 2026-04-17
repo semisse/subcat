@@ -14,6 +14,8 @@
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
+    "dev:new": "electron-vite dev",
+    "build:new": "electron-vite build",
     "postinstall": "electron-builder install-app-deps && ([[ \"$OSTYPE\" == \"darwin\"* ]] && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist || true)"
   },
   "build": {
@@ -78,7 +80,10 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.3",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "zustand": "^5.0.12"
   },
   "jest": {
     "testEnvironment": "node",
@@ -105,13 +110,19 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
     "electron": "^35.0.0",
     "electron-builder": "^26.8.1",
     "electron-reload": "^2.0.0-alpha.1",
+    "electron-vite": "^5.0.0",
     "eslint": "^10.2.0",
     "eslint-plugin-jest": "^29.15.1",
     "globals": "^17.4.0",
     "jest": "^30.3.0",
-    "jest-environment-jsdom": "^30.3.0"
+    "jest-environment-jsdom": "^30.3.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.2"
   }
 }
