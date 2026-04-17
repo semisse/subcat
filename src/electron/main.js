@@ -96,8 +96,8 @@ function createMainWindow() {
     });
     const newRenderer = process.env.SUBCAT_NEW_RENDERER === '1';
     if (newRenderer) {
-        if (process.env.NODE_ENV === 'development') {
-            mainWindow.loadURL('http://localhost:5173');
+        if (process.env.ELECTRON_RENDERER_URL) {
+            mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
         }
         else {
             mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));

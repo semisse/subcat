@@ -18,6 +18,11 @@ export default defineConfig({
   renderer: {
     root: 'renderer/src-new',
     plugins: [react()],
+    server: {
+      fs: {
+        allow: ['..', '../..'],
+      },
+    },
     build: {
       rollupOptions: {
         input: 'renderer/src-new/index.html',

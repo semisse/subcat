@@ -14,7 +14,7 @@
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "dev:new": "electron-vite dev",
+    "dev:new": "SUBCAT_NEW_RENDERER=1 electron-vite dev",
     "build:new": "electron-vite build",
     "typecheck": "tsc --noEmit -p renderer/src-new/tsconfig.json",
     "postinstall": "electron-builder install-app-deps && ([[ \"$OSTYPE\" == \"darwin\"* ]] && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist || true)"
