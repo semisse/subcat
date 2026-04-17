@@ -1,6 +1,6 @@
 {
   "name": "subcat",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Get notified when a GitHub Actions CI run finishes",
   "author": "Samuel Fialho",
   "main": "src/electron/main.js",
@@ -12,7 +12,7 @@
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.js",
     "lint": "eslint src/ renderer/",
     "build": "electron-builder",
-    "build:mac": "electron-builder --mac --config.mac.target=dmg",
+    "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "postinstall": "electron-builder install-app-deps && ([[ \"$OSTYPE\" == \"darwin\"* ]] && plutil -replace CFBundleName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist && plutil -replace CFBundleDisplayName -string SubCat node_modules/electron/dist/Electron.app/Contents/Info.plist || true)"
   },
@@ -28,7 +28,17 @@
       "icon": "assets/Icon-iOS-Default-1024x1024@1x.png",
       "category": "public.app-category.developer-tools",
       "identity": "Samuel Fialho (49Y5FW82WK)",
-      "notarize": true
+      "notarize": true,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["arm64"]
+        }
+      ]
     },
     "linux": {
       "icon": "assets",
