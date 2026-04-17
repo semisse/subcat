@@ -1,5 +1,20 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Subscribes `callback` to an IPC event and returns an unsubscribe function.
+// The old renderer ignores the return; the new React renderer uses it in
+// useEffect cleanup to avoid memory leaks on unmount.
+const subscribe = (channel) => (callback) => {
+    const listener = (_, data) => callback(data);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+};
+
+const subscribeVoid = (channel) => (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+};
+
 contextBridge.exposeInMainWorld('api', {
     startWatching: (data) => ipcRenderer.invoke('start-watching', data),
     fetchUserPRs: () => ipcRenderer.invoke('fetch-user-prs'),
@@ -12,30 +27,30 @@ contextBridge.exposeInMainWorld('api', {
     rerunRun: (runId) => ipcRenderer.invoke('rerun-run', runId),
     rerunFailedRun: (runId) => ipcRenderer.invoke('rerun-failed-run', runId),
     openExternal: (url) => ipcRenderer.invoke('open-external', url),
-    onRunUpdate: (callback) => ipcRenderer.on('run-update', (_, data) => callback(data)),
-    onRunError: (callback) => ipcRenderer.on('run-error', (_, data) => callback(data)),
-    onRunReportReady: (callback) => ipcRenderer.on('run-report-ready', (_, data) => callback(data)),
-    onRunRestored: (callback) => ipcRenderer.on('run-restored', (_, data) => callback(data)),
+    onRunUpdate: subscribe('run-update'),
+    onRunError: subscribe('run-error'),
+    onRunReportReady: subscribe('run-report-ready'),
+    onRunRestored: subscribe('run-restored'),
     saveReport: (runId) => ipcRenderer.invoke('save-report', runId),
     savePRWorkflowReport: (data) => ipcRenderer.invoke('save-pr-workflow-report', data),
     rerunRunDirect: (opts) => ipcRenderer.invoke('rerun-run-direct', opts),
     rerunFailedJobsDirect: (opts) => ipcRenderer.invoke('rerun-failed-jobs-direct', opts),
     cancelRunDirect: (opts) => ipcRenderer.invoke('cancel-run-direct', opts),
     watchWorkflowRerun: (opts) => ipcRenderer.invoke('watch-workflow-rerun', opts),
-    onWorkflowRunAppeared: (callback) => ipcRenderer.on('workflow-run-appeared', (_, data) => callback(data)),
+    onWorkflowRunAppeared: subscribe('workflow-run-appeared'),
     pinWorkflow: (url) => ipcRenderer.invoke('pin-workflow', url),
     unpinWorkflow: (id) => ipcRenderer.invoke('unpin-workflow', id),
-    onPinnedWorkflowUpdate: (callback) => ipcRenderer.on('pinned-workflow-update', (_, data) => callback(data)),
-    onPinnedWorkflowRestored: (callback) => ipcRenderer.on('pinned-workflow-restored', (_, data) => callback(data)),
+    onPinnedWorkflowUpdate: subscribe('pinned-workflow-update'),
+    onPinnedWorkflowRestored: subscribe('pinned-workflow-restored'),
 
     getVersion: () => ipcRenderer.invoke('get-version'),
     showAbout: () => ipcRenderer.invoke('show-about'),
     authGetStatus: () => ipcRenderer.invoke('auth-get-status'),
     authStartLogin: () => ipcRenderer.invoke('auth-start-login'),
     authLogout: () => ipcRenderer.invoke('auth-logout'),
-    onAuthLoggedIn: (callback) => ipcRenderer.on('auth-logged-in', (_, data) => callback(data)),
-    onAuthError: (callback) => ipcRenderer.on('auth-error', (_, data) => callback(data)),
-    onOpenNewWatch: (callback) => ipcRenderer.on('open-new-watch', () => callback()),
+    onAuthLoggedIn: subscribe('auth-logged-in'),
+    onAuthError: subscribe('auth-error'),
+    onOpenNewWatch: subscribeVoid('open-new-watch'),
     saveFailedOnlyAttempt: (opts) => ipcRenderer.invoke('save-failed-only-attempt', opts),
     savePendingRerun: (opts) => ipcRenderer.invoke('save-pending-rerun', opts),
     getPendingRerun: (opts) => ipcRenderer.invoke('get-pending-rerun', opts),
@@ -55,9 +70,9 @@ contextBridge.exposeInMainWorld('api', {
     getUnreadNotificationCount: () => ipcRenderer.invoke('get-unread-notification-count'),
     markNotificationsRead: () => ipcRenderer.invoke('mark-notifications-read'),
     clearNotifications: () => ipcRenderer.invoke('clear-notifications'),
-    onNotificationAdded: (cb) => ipcRenderer.on('notification-added', (_, data) => cb(data)),
-    onUpdateDownloadProgress: (cb) => ipcRenderer.on('update-download-progress', (_, data) => cb(data)),
-    onUpdateReady: (cb) => ipcRenderer.on('update-ready', (_, data) => cb(data)),
+    onNotificationAdded: subscribe('notification-added'),
+    onUpdateDownloadProgress: subscribe('update-download-progress'),
+    onUpdateReady: subscribe('update-ready'),
     installUpdate: () => ipcRenderer.invoke('install-update'),
 
     // Lab Test
@@ -69,7 +84,7 @@ contextBridge.exposeInMainWorld('api', {
     getLocalRuns: () => ipcRenderer.invoke('local-run:list'),
     deleteLocalRun: (id) => ipcRenderer.invoke('local-run:delete', { id }),
     saveLocalRunReport: (id) => ipcRenderer.invoke('local-run:save-report', { id }),
-    onLocalRunOutput: (cb) => ipcRenderer.on('local-run:output', (_, data) => cb(data)),
-    onLocalRunProgress: (cb) => ipcRenderer.on('local-run:progress', (_, data) => cb(data)),
-    onLocalRunDone: (cb) => ipcRenderer.on('local-run:done', (_, data) => cb(data)),
+    onLocalRunOutput: subscribe('local-run:output'),
+    onLocalRunProgress: subscribe('local-run:progress'),
+    onLocalRunDone: subscribe('local-run:done'),
 });
