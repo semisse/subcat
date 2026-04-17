@@ -19,6 +19,19 @@ const ipcLocalRunner = require('./ipc/local-runner');
 
 app.setName('SubCat');
 
+// GUI-launched apps on macOS don't inherit the shell PATH, so `spawn('docker')`
+// fails with ENOENT even when Docker Desktop is running. Prepend the standard
+// locations (Intel Homebrew, Apple Silicon Homebrew, Docker Desktop bundle) so
+// the Lab Test runner can find the binary regardless of how the app was opened.
+if (process.platform === 'darwin') {
+    const extraPath = [
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+        '/Applications/Docker.app/Contents/Resources/bin',
+    ].join(':');
+    process.env.PATH = process.env.PATH ? `${extraPath}:${process.env.PATH}` : extraPath;
+}
+
 if (process.env.SUBCAT_E2E) {
     const os = require('os');
     app.setPath('userData', require('fs').mkdtempSync(path.join(os.tmpdir(), 'subcat-e2e-')));
