@@ -222,12 +222,17 @@ function applyCompletedState(runId, { failed, failedTests }) {
         const actions = card.querySelector('.run-actions');
         const openBtn = actions.querySelector('.open-btn');
 
-        // 3. Report — insert before Open
-        const reportBtn = document.createElement('button');
-        reportBtn.className = 'report-btn';
-        reportBtn.textContent = 'Report';
-        reportBtn.addEventListener('click', () => window.api.saveReport(runId));
-        actions.insertBefore(reportBtn, openBtn);
+        // 3. Report — insert before Open (idempotent: skip if already present
+        // because onRunRestored and run-report-ready can both fire for the
+        // same run).
+        if (!actions.querySelector('.report-btn')) {
+            const reportBtn = document.createElement('button');
+            reportBtn.className = 'report-btn';
+            reportBtn.textContent = 'Report';
+            reportBtn.addEventListener('click', () => window.api.saveReport(runId));
+            actions.insertBefore(reportBtn, openBtn);
+        }
+        const reportBtn = actions.querySelector('.report-btn');
 
         // 2. Rerun All — insert before Report (add only if not already there from updateRunCard)
         if (!actions.querySelector('.rerun-btn')) {
@@ -252,8 +257,8 @@ function applyCompletedState(runId, { failed, failedTests }) {
             actions.insertBefore(actions.querySelector('.rerun-btn'), reportBtn);
         }
 
-        // 1. Rerun Failed — insert before Rerun All
-        if (failed > 0) {
+        // 1. Rerun Failed — insert before Rerun All (idempotent)
+        if (failed > 0 && !actions.querySelector('.rerun-failed-btn')) {
             const rerunBtn = actions.querySelector('.rerun-btn');
             const rerunFailedBtn = document.createElement('button');
             rerunFailedBtn.className = 'rerun-failed-btn';
@@ -283,7 +288,7 @@ function applyCompletedState(runId, { failed, failedTests }) {
             });
             actions.insertBefore(rerunFailedBtn, rerunBtn);
 
-            if (failedTests?.length > 0) {
+            if (failedTests?.length > 0 && !card.querySelector('.failed-tests')) {
                 const list = document.createElement('ul');
                 list.className = 'failed-tests';
                 for (const t of failedTests) {

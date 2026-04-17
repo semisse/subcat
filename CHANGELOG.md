@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.2] — 2026-04-17
+
+### Fixed
+- **Run-card buttons duplicated in Watching list** — `applyCompletedState` was appending Report and Rerun Failed Only buttons (and the failed-tests list) without an idempotency guard, so runs that triggered both `run-restored` on boot and `run-report-ready` from the poller ended up with overlapping buttons stacked on top of each other. All three insertions are now idempotent.
+- **Docker not detected when the app is launched from Finder** — GUI-launched macOS apps don't inherit the shell `PATH`, so `spawn('docker')` in the Lab Test check failed with ENOENT even when Docker Desktop was running. The main process now prepends `/usr/local/bin`, `/opt/homebrew/bin`, and the Docker Desktop bundle path on startup so Lab Test works regardless of how the app was opened.
+
 ## [1.2.1] — 2026-04-17
 
 ### Fixed
