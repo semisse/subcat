@@ -128,7 +128,8 @@ function updateRunCard(runId, status, conclusion, name, repeatCurrent, repeatTot
         if (status === 'completed') {
             card.dataset.active = 'false';
             card.querySelector('.cancel-run-btn')?.remove();
-            if (!card.querySelector('.rerun-btn')) {
+            const isFinalIteration = !(repeatTotal > 1 && repeatCurrent < repeatTotal);
+            if (isFinalIteration && !card.querySelector('.rerun-btn')) {
                 const rerunBtn = document.createElement('button');
                 rerunBtn.className = 'rerun-btn';
                 rerunBtn.textContent = '↩ Rerun';
@@ -204,96 +205,94 @@ window.api.onRunRestored((data) => {
     if (data.status === 'completed') {
         const conclusion = data.failed === 0 ? 'success' : 'failure';
         addRunCard(data.runId, data.name, 'completed', conclusion, data.url, data.repeatTotal, data.repeatCurrent, data.results, source);
-        const card = document.getElementById(`run-${data.runId}`);
-        card?.querySelector('.cancel-run-btn')?.remove();
-        if (card && data.repeatTotal > 1) {
-            const reportBtn = document.createElement('button');
-            reportBtn.className = 'report-btn';
-            reportBtn.textContent = 'Report';
-            reportBtn.addEventListener('click', () => window.api.saveReport(data.runId));
-            card.querySelector('.run-actions').prepend(reportBtn);
-        }
+        applyCompletedState(data.runId, { failed: data.failed, failedTests: [] });
     } else {
         addRunCard(data.runId, data.name, 'in_progress', null, data.url, data.repeatTotal, data.repeatCurrent, data.results, source);
     }
 });
 
 function applyCompletedState(runId, { failed, failedTests }) {
-    const card = document.getElementById(`run-${runId}`);
-    if (!card) return;
-    const actions = card.querySelector('.run-actions');
-    const openBtn = actions.querySelector('.open-btn');
+    const cards = [
+        document.getElementById(`run-${runId}`),
+        document.getElementById(`run-page-${runId}`),
+    ].filter(Boolean);
+    if (!cards.length) return;
 
-    // 3. Report — insert before Open
-    const reportBtn = document.createElement('button');
-    reportBtn.className = 'report-btn';
-    reportBtn.textContent = 'Report';
-    reportBtn.addEventListener('click', () => window.api.saveReport(runId));
-    actions.insertBefore(reportBtn, openBtn);
+    for (const card of cards) {
+        const actions = card.querySelector('.run-actions');
+        const openBtn = actions.querySelector('.open-btn');
 
-    // 2. Rerun All — insert before Report (add only if not already there from updateRunCard)
-    if (!actions.querySelector('.rerun-btn')) {
-        const rerunBtn = document.createElement('button');
-        rerunBtn.className = 'rerun-btn';
-        rerunBtn.textContent = '↩ Rerun';
-        rerunBtn.addEventListener('click', async () => {
-            rerunBtn.disabled = true;
-            rerunBtn.textContent = 'Starting…';
-            const result = await window.api.rerunRun(runId);
-            if (result.error) {
-                rerunBtn.disabled = false;
-                rerunBtn.textContent = '↩ Rerun';
-            } else {
-                rerunBtn.remove();
+        // 3. Report — insert before Open
+        const reportBtn = document.createElement('button');
+        reportBtn.className = 'report-btn';
+        reportBtn.textContent = 'Report';
+        reportBtn.addEventListener('click', () => window.api.saveReport(runId));
+        actions.insertBefore(reportBtn, openBtn);
+
+        // 2. Rerun All — insert before Report (add only if not already there from updateRunCard)
+        if (!actions.querySelector('.rerun-btn')) {
+            const rerunBtn = document.createElement('button');
+            rerunBtn.className = 'rerun-btn';
+            rerunBtn.textContent = '↩ Rerun';
+            rerunBtn.addEventListener('click', async () => {
+                rerunBtn.disabled = true;
+                rerunBtn.textContent = 'Starting…';
+                const result = await window.api.rerunRun(runId);
+                if (result.error) {
+                    rerunBtn.disabled = false;
+                    rerunBtn.textContent = '↩ Rerun';
+                } else {
+                    rerunBtn.remove();
+                    card.dataset.active = 'true';
+                }
+            });
+            actions.insertBefore(rerunBtn, reportBtn);
+        } else {
+            // rerun-btn exists from updateRunCard — move it before report
+            actions.insertBefore(actions.querySelector('.rerun-btn'), reportBtn);
+        }
+
+        // 1. Rerun Failed — insert before Rerun All
+        if (failed > 0) {
+            const rerunBtn = actions.querySelector('.rerun-btn');
+            const rerunFailedBtn = document.createElement('button');
+            rerunFailedBtn.className = 'rerun-failed-btn';
+            rerunFailedBtn.textContent = '↩ Rerun Failed Only';
+            rerunFailedBtn.addEventListener('click', async () => {
+                rerunFailedBtn.disabled = true;
+                rerunFailedBtn.textContent = 'Starting…';
+
+                // optimistic UI update
+                card.className = 'run-card in-progress';
+                card.querySelector('.status-dot').className = 'status-dot queued';
+                card.querySelector('.status-text').textContent = 'queued';
+                card.querySelector('.failed-tests')?.remove();
                 card.dataset.active = 'true';
+
+                const result = await window.api.rerunFailedRun(runId);
+                if (result.error) {
+                    card.className = 'run-card completed-failure';
+                    card.querySelector('.status-dot').className = 'status-dot failure';
+                    card.querySelector('.status-text').textContent = 'failure';
+                    card.dataset.active = 'false';
+                    rerunFailedBtn.disabled = false;
+                    rerunFailedBtn.textContent = '↩ Rerun Failed Only';
+                } else {
+                    rerunFailedBtn.remove();
+                }
+            });
+            actions.insertBefore(rerunFailedBtn, rerunBtn);
+
+            if (failedTests?.length > 0) {
+                const list = document.createElement('ul');
+                list.className = 'failed-tests';
+                for (const t of failedTests) {
+                    const li = document.createElement('li');
+                    li.textContent = t;
+                    list.appendChild(li);
+                }
+                card.appendChild(list);
             }
-        });
-        actions.insertBefore(rerunBtn, reportBtn);
-    } else {
-        // rerun-btn exists from updateRunCard — move it before report
-        actions.insertBefore(actions.querySelector('.rerun-btn'), reportBtn);
-    }
-
-    // 1. Rerun Failed — insert before Rerun All
-    if (failed > 0) {
-        const rerunBtn = actions.querySelector('.rerun-btn');
-        const rerunFailedBtn = document.createElement('button');
-        rerunFailedBtn.className = 'rerun-failed-btn';
-        rerunFailedBtn.textContent = '↩ Rerun Failed Only';
-        rerunFailedBtn.addEventListener('click', async () => {
-            rerunFailedBtn.disabled = true;
-            rerunFailedBtn.textContent = 'Starting…';
-
-            // optimistic UI update
-            card.className = 'run-card in-progress';
-            card.querySelector('.status-dot').className = 'status-dot queued';
-            card.querySelector('.status-text').textContent = 'queued';
-            card.querySelector('.failed-tests')?.remove();
-            card.dataset.active = 'true';
-
-            const result = await window.api.rerunFailedRun(runId);
-            if (result.error) {
-                card.className = 'run-card completed-failure';
-                card.querySelector('.status-dot').className = 'status-dot failure';
-                card.querySelector('.status-text').textContent = 'failure';
-                card.dataset.active = 'false';
-                rerunFailedBtn.disabled = false;
-                rerunFailedBtn.textContent = '↩ Rerun Failed Only';
-            } else {
-                rerunFailedBtn.remove();
-            }
-        });
-        actions.insertBefore(rerunFailedBtn, rerunBtn);
-
-        if (failedTests?.length > 0) {
-            const list = document.createElement('ul');
-            list.className = 'failed-tests';
-            for (const t of failedTests) {
-                const li = document.createElement('li');
-                li.textContent = t;
-                list.appendChild(li);
-            }
-            card.appendChild(list);
         }
     }
 }
