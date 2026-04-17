@@ -184,14 +184,19 @@ async function handleRun() {
     const maxWorkers = maxWorkersRaw ? parseInt(maxWorkersRaw, 10) : null;
     const ulimitEnabled = document.getElementById('labTestUlimitEnabled')?.checked ?? false;
     const ulimitNofile  = ulimitEnabled ? (parseInt(document.getElementById('labTestUlimitValue')?.value, 10) || 512) : null;
+    // For fields where 0 is a valid value, `|| default` would swallow it — use a guard instead.
+    const intOr = (raw, fallback) => {
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) && n >= 0 ? n : fallback;
+    };
     const networkLatencyEnabled = document.getElementById('labTestNetworkLatencyEnabled')?.checked ?? false;
-    const networkLatency = networkLatencyEnabled ? (parseInt(document.getElementById('labTestNetworkLatencyMs')?.value, 10) || 100) : null;
+    const networkLatency = networkLatencyEnabled ? intOr(document.getElementById('labTestNetworkLatencyMs')?.value, 100) : null;
     const cpuStressEnabled = document.getElementById('labTestCpuStressEnabled')?.checked ?? false;
     const cpuStress = cpuStressEnabled ? (parseInt(document.getElementById('labTestCpuStressWorkers')?.value, 10) || 2) : null;
     const packetLossEnabled = document.getElementById('labTestPacketLossEnabled')?.checked ?? false;
-    const packetLoss = packetLossEnabled ? (parseInt(document.getElementById('labTestPacketLossPercent')?.value, 10) || 5) : null;
+    const packetLoss = packetLossEnabled ? intOr(document.getElementById('labTestPacketLossPercent')?.value, 5) : null;
     const staleReadEnabled = document.getElementById('labTestStaleReadEnabled')?.checked ?? false;
-    const staleRead = staleReadEnabled ? (parseInt(document.getElementById('labTestStaleReadMs')?.value, 10) || 200) : null;
+    const staleRead = staleReadEnabled ? intOr(document.getElementById('labTestStaleReadMs')?.value, 200) : null;
     const envFile = document.getElementById('labTestEnvFile')?.value.trim() || null;
     const envTarget = document.getElementById('labTestEnvTarget')?.value.trim() || null;
     const platform = document.getElementById('labTestForceAmd64')?.checked ? 'linux/amd64' : null;
@@ -214,8 +219,14 @@ async function handleRun() {
     if (barFill) { barFill.style.width = '0%'; barFill.classList.remove('done', 'has-failures'); }
     if (barLabel) barLabel.textContent = '0%';
 
-    const { id } = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform });
-    activeRunId = id;
+    const result = await window.api.startLocalRun({ repoPath, testCommand: testCmd, repeat, cpus, memoryGb, randomize, timezone, maxWorkers, ulimitNofile, networkLatency, cpuStress, packetLoss, staleRead, envFile, envTarget, installCommand, platform });
+    if (result?.error) {
+        setPageState('done');
+        const summaryEl = document.getElementById('labTestResultSummary');
+        if (summaryEl) summaryEl.innerHTML = `<span class="lab-result-error">${escapeHtml(result.error)}</span>`;
+        return;
+    }
+    activeRunId = result.id;
     setNavRunningDot(true);
 }
 
