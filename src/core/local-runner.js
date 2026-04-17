@@ -259,6 +259,10 @@ class LocalRunner extends EventEmitter {
         // Quote args that contain spaces/special chars for display purposes
         const displayArgs = args.map(a => /[\s&|;$]/.test(a) ? `'${a}'` : a);
         this._dockerCmd = `$ docker ${displayArgs.join(' ')}`;
+        // Emit as an output line now that detectImage has resolved. The IPC
+        // handler already has its `line` listener attached, and the renderer
+        // has set activeRunId (we're well past the invoke response).
+        this.emit('line', this._dockerCmd);
         this._process = spawn('docker', args);
 
         let stdoutBuf = '';
