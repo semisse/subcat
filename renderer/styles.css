@@ -966,6 +966,20 @@
             color: var(--text-secondary);
         }
 
+        /* Text-labelled actions (injected dynamically on completion) need to
+           escape the 28x28 icon sizing above and render as compact pills. */
+        .run-actions button.rerun-btn,
+        .run-actions button.rerun-failed-btn,
+        .run-actions button.report-btn,
+        .run-actions button.cancel-run-btn {
+            width: auto;
+            padding: 0 10px;
+            font-size: 12px;
+            font-weight: 500;
+            gap: 4px;
+            border-color: var(--border-color);
+        }
+
         .run-actions button.open-btn:hover {
             border-color: var(--accent-blue);
             color: var(--accent-blue);
