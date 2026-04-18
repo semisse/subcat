@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0] — unreleased
+
+### Changed
+- **Renderer completo migrado para React + TypeScript** (electron-vite, Zustand, hash router). Substitui o renderer legacy vanilla JS. Paridade funcional total com v1.2.3 — sem features novas nesta release, apenas migração de framework.
+
+### Removed
+- Legacy renderer (`renderer/renderer.js`, `renderer/pages/`, `renderer/components/`, `renderer/dom-refs.js`) e env gate `SUBCAT_NEW_RENDERER` após cutover.
+
 ## [1.2.3] — 2026-04-17
 
 ### Fixed
